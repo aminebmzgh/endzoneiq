@@ -1,6 +1,5 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/components/locale-link";
-import { AfterKickoff } from "@/components/after-kickoff";
 import { LocalTime } from "@/components/local-time";
 import { pct } from "@/lib/site/labels";
 import type { GameSummary, TeamLite } from "@/lib/site/types";
@@ -109,19 +108,12 @@ export function GameCard({ game }: { game: GameSummary }) {
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">
-          {game.status === "scheduled" ? (
-            <AfterKickoff iso={game.kickoffAt} before={t("noPick")} after={t("noPickPast")} />
-          ) : (
-            t("noPickPast")
-          )}
+          {game.kickedOff ? t("noPickPast") : t("noPick")}
         </p>
       )}
 
-      {!final && pick && (
-        <AfterKickoff
-          iso={game.kickoffAt}
-          after={<p className="mt-2 text-xs text-muted-foreground">{t("locked")}</p>}
-        />
+      {game.kickedOff && !final && pick && (
+        <p className="mt-2 text-xs text-muted-foreground">{t("locked")}</p>
       )}
 
       <Link

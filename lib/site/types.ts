@@ -43,6 +43,11 @@ export interface GameSummary {
   away: TeamLite;
   venue: string | null;
   neutralSite: boolean;
+  /**
+   * Kickoff has passed, as of when the cached data was read (at most about an hour
+   * stale). Cards use it; the game page re-checks in the browser.
+   */
+  kickedOff: boolean;
   pick: PickSummary | null;
 }
 

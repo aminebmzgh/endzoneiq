@@ -92,6 +92,8 @@ function toSummary(r: SummaryRow): GameSummary {
     away: r.away,
     venue: r.venue,
     neutralSite: r.neutralSite,
+    // Inside "use cache": part of the cached result, refreshed with it.
+    kickedOff: r.kickoffAt.getTime() <= Date.now(),
     pick:
       r.pickWinnerId === null
         ? null
