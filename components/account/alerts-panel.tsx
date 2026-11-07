@@ -89,14 +89,15 @@ export function AlertsPanel({
     void load();
   }, [load]);
 
-  async function enablePush() {
-    if (!data?.vapidPublicKey) return;
+  /** Turn push on for this device. Returns whether it worked. */
+  async function enablePush(): Promise<boolean> {
+    if (!data?.vapidPublicKey) return false;
     setPushState("busy");
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushState("denied");
-        return;
+        return false;
       }
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
@@ -110,9 +111,19 @@ export function AlertsPanel({
       if (!res.ok) throw new Error(String(res.status));
       setSubscribed(true);
       setPushState("idle");
+      return true;
     } catch {
       setPushState("error");
+      return false;
     }
+  }
+
+  /** Always available: turns push on first if needed, then sends a test to this user. */
+  async function sendTest() {
+    setTestState("idle");
+    if (!subscribed && !(await enablePush())) return;
+    const res = await send("/api/alerts/push", "PUT", { locale });
+    setTestState(res.ok ? "sent" : "error");
   }
 
   async function disablePush() {
@@ -143,40 +154,37 @@ export function AlertsPanel({
         ) : (
           <div className="mt-2 flex flex-wrap items-center gap-3">
             {subscribed ? (
-              <>
-                <span className="text-sm text-accent">{labels.pushOn}</span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const res = await send("/api/alerts/push", "PUT", { locale });
-                    setTestState(res.ok ? "sent" : "error");
-                  }}
-                  className="h-9 rounded-md border border-border px-3 text-sm hover:bg-muted"
-                >
-                  {labels.testPush}
-                </button>
-                {testState === "sent" && (
-                  <span className="text-sm text-accent">{labels.testSent}</span>
-                )}
-                <button
-                  type="button"
-                  onClick={disablePush}
-                  disabled={pushState === "busy"}
-                  className="h-9 rounded-md border border-border px-3 text-sm hover:bg-muted"
-                >
-                  {labels.disablePush}
-                </button>
-              </>
+              <span className="text-sm text-accent">{labels.pushOn}</span>
             ) : (
               <button
                 type="button"
-                onClick={enablePush}
+                onClick={() => void enablePush()}
                 disabled={pushState === "busy" || !data.vapidPublicKey}
                 className="h-9 rounded-md bg-accent px-3 text-sm font-medium text-accent-foreground disabled:opacity-60"
               >
                 {labels.enablePush}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => void sendTest()}
+              disabled={pushState === "busy" || !data.vapidPublicKey}
+              className="h-9 rounded-md border border-border px-3 text-sm hover:bg-muted disabled:opacity-60"
+            >
+              {labels.testPush}
+            </button>
+            {subscribed && (
+              <button
+                type="button"
+                onClick={disablePush}
+                disabled={pushState === "busy"}
+                className="h-9 rounded-md border border-border px-3 text-sm hover:bg-muted"
+              >
+                {labels.disablePush}
+              </button>
+            )}
+            {testState === "sent" && <span className="text-sm text-accent">{labels.testSent}</span>}
+            {testState === "error" && <span className="text-sm text-danger">{labels.error}</span>}
             {pushState === "denied" && (
               <span className="text-sm text-danger">{labels.pushDenied}</span>
             )}
