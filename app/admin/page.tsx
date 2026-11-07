@@ -21,11 +21,17 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-async function Admin({ email }: { email: string }) {
+async function Admin() {
+  const viewer = await getViewer(await headers());
+  if (!isAdmin(viewer)) notFound();
+  const email = viewer!.email;
   const o = await adminOverview();
 
   return (
     <div className="space-y-4">
+      <h1 className="text-2xl font-bold">
+        Endzone<span className="text-accent">IQ</span> admin
+      </h1>
       <p className="text-sm text-muted-foreground">
         Signed in as {email}. Overrides apply to the next prediction of their game; saving one
         starts a re-prediction. Picks of kicked-off games are locked.
@@ -165,18 +171,13 @@ async function Admin({ email }: { email: string }) {
  * Admins only. Anonymous requests are answered 404 by proxy.ts before rendering; a
  * signed-in non-admin gets the not-found page from the check below.
  */
-export default async function AdminPage() {
-  const viewer = await getViewer(await headers());
-  if (!isAdmin(viewer)) notFound();
+export default function AdminPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
-      <h1 className="mb-4 text-2xl font-bold">
-        Endzone<span className="text-accent">IQ</span> admin
-      </h1>
       <Suspense
         fallback={<div aria-busy="true" className="h-64 rounded-lg border border-border bg-card" />}
       >
-        <Admin email={viewer!.email} />
+        <Admin />
       </Suspense>
     </main>
   );
