@@ -1,0 +1,36 @@
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# deploy packaging
+/dist-deploy/
+/dist-migrator/
+*.tar.gz
+
+# env files: never commit secrets (only the template)
+.env
+.env.*
+!.env.example
+
+# python pipeline
+/pipeline/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+/pipeline/.cache/
+/pipeline/artifacts/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel

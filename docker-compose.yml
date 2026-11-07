@@ -1,0 +1,31 @@
+# Local MySQL-compatible database matching Hostinger (MariaDB).
+# Verify the production version via https://endzoneiq.com/api/health (db.version)
+# after the first deploy and keep this image tag in sync.
+services:
+  db:
+    image: mariadb:11.8
+    container_name: endzoneiq-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: endzoneiq
+      MARIADB_USER: endzoneiq
+      MARIADB_PASSWORD: endzoneiq
+      MARIADB_ROOT_PASSWORD: endzoneiq-root
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+      # Hostinger users are not SUPER; mirror that for trigger creation.
+      - --log-bin-trust-function-creators=0
+    ports:
+      - "3306:3306"
+    volumes:
+      - endzoneiq-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  endzoneiq-db:

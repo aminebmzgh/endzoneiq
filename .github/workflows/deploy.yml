@@ -1,0 +1,101 @@
+# Build on GitHub Actions, upload a prebuilt package to Hostinger, verify it.
+# Hostinger never compiles the app (its "build" step is `echo prebuilt`).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write # prune old deploy artifacts (keep the last 10 for rollbacks)
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build & package
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Build-time public values (baked into the bundle). Server secrets are NOT here:
+      # they live only in Hostinger's environment variables.
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: next build (standalone)
+        run: |
+          export BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
+          npm run build
+      - name: Fail if a server secret reached client code
+        run: npm run check:client-secrets
+      - run: npm run build:migrator
+      - name: Package
+        run: bash scripts/package-standalone.sh dist-deploy endzoneiq-deploy.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-package
+          path: endzoneiq-deploy.tar.gz
+          retention-days: 90
+          if-no-files-found: error
+
+  deploy:
+    name: Upload to Hostinger & smoke test
+    needs: build
+    # Stays off until the Hostinger site exists (set repo variable DEPLOY_ENABLED=true).
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: deploy-package
+      - name: Upload and activate on Hostinger
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ vars.HOSTINGER_USERNAME }}
+          HOSTINGER_WEBSITE: ${{ vars.HOSTINGER_WEBSITE }}
+          NODE_MAJOR: "24"
+        run: bash scripts/hostinger-deploy.sh endzoneiq-deploy.tar.gz
+      - name: Smoke test /api/health
+        run: bash scripts/smoke-test.sh "${{ vars.NEXT_PUBLIC_SITE_URL }}" "${{ github.sha }}"
+      - name: Rollback instructions
+        if: failure()
+        run: |
+          {
+            echo "## ❌ Deploy of \`${GITHUB_SHA::7}\` failed"
+            echo
+            echo "Production may be serving a broken or previous build. To roll back:"
+            echo "1. Find the last good **Deploy** run in the Actions tab and copy its run ID."
+            echo "2. Run the **Rollback** workflow with that run ID:"
+            echo "   \`gh workflow run rollback.yml -f run_id=<RUN_ID>\`"
+            echo "3. Check the Node.js runtime logs in hPanel if the app does not start (often a migration error)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep only the 10 most recent deploy packages
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=deploy-package&per_page=100" \
+            -q '.artifacts | sort_by(.created_at) | reverse | .[10:] | .[].id' |
+          while read -r id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}"; done

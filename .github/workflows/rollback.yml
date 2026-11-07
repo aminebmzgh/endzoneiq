@@ -1,0 +1,52 @@
+# Re-deploy the package built by an earlier Deploy run (no rebuild).
+#   gh workflow run rollback.yml -f run_id=<deploy run id>
+# Migrations are forward-only and written backward-compatible (add first, remove
+# later), so an older build keeps working against the newer schema.
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID of the Deploy workflow run to restore"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download package from run ${{ inputs.run_id }}
+        uses: actions/download-artifact@v5
+        with:
+          name: deploy-package
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Read build info
+        id: info
+        run: |
+          SHA=$(tar -xzOf endzoneiq-deploy.tar.gz ./build-info.json | jq -r .sha)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Rolling back to $SHA (run ${{ inputs.run_id }})" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload and activate on Hostinger
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ vars.HOSTINGER_USERNAME }}
+          HOSTINGER_WEBSITE: ${{ vars.HOSTINGER_WEBSITE }}
+          NODE_MAJOR: "24"
+        run: bash scripts/hostinger-deploy.sh endzoneiq-deploy.tar.gz
+      - name: Smoke test /api/health
+        run: bash scripts/smoke-test.sh "${{ vars.NEXT_PUBLIC_SITE_URL }}" "${{ steps.info.outputs.sha }}"

@@ -1,0 +1,26 @@
+{
+  "Meta": {
+    "title": "EndzoneIQ: NFL picks explained in 60 seconds",
+    "description": "Every NFL game gets a pick, a win probability and three plain-English reasons. Every pick is tracked publicly."
+  },
+  "Home": {
+    "tagline": "Every NFL game, explained in 60 seconds.",
+    "comingSoon": "Picks for every game, with a win probability and three plain-English reasons. Launching soon.",
+    "principle1": "A pick and a win probability for every game",
+    "principle2": "Three reasons, built only from real model data",
+    "principle3": "A public track record of every pick, wins and losses"
+  },
+  "Footer": {
+    "disclaimer": "EndzoneIQ is an independent analysis service and is not affiliated with or endorsed by the NFL or any team.",
+    "entertainment": "For entertainment and informational purposes. Not betting advice."
+  },
+  "Theme": {
+    "toggle": "Toggle color theme"
+  },
+  "Locale": {
+    "label": "Language",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  }
+}

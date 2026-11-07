@@ -1,0 +1,26 @@
+{
+  "Meta": {
+    "title": "EndzoneIQ: pronósticos de la NFL explicados en 60 segundos",
+    "description": "Cada partido de la NFL tiene un pronóstico, una probabilidad de victoria y tres razones claras. Cada pronóstico se registra públicamente."
+  },
+  "Home": {
+    "tagline": "Cada partido de la NFL, explicado en 60 segundos.",
+    "comingSoon": "Un pronóstico para cada partido, con probabilidad de victoria y tres razones claras. Muy pronto.",
+    "principle1": "Un pronóstico y una probabilidad de victoria para cada partido",
+    "principle2": "Tres razones, basadas solo en datos reales del modelo",
+    "principle3": "Un historial público de cada pronóstico, aciertos y fallos incluidos"
+  },
+  "Footer": {
+    "disclaimer": "EndzoneIQ es un servicio de análisis independiente y no está afiliado ni respaldado por la NFL ni por ningún equipo.",
+    "entertainment": "Con fines de entretenimiento e información. No es asesoramiento de apuestas."
+  },
+  "Theme": {
+    "toggle": "Cambiar tema de color"
+  },
+  "Locale": {
+    "label": "Idioma",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  }
+}

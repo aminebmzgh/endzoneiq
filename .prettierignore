@@ -1,0 +1,9 @@
+node_modules
+.next
+dist-deploy
+dist-migrator
+db/migrations
+pipeline
+package-lock.json
+AGENTS.md
+endzoneiq-claude-code-prompt.md

@@ -1,0 +1,26 @@
+{
+  "Meta": {
+    "title": "EndzoneIQ : les pronostics NFL expliqués en 60 secondes",
+    "description": "Chaque match NFL reçoit un pronostic, une probabilité de victoire et trois raisons claires. Chaque pronostic est suivi publiquement."
+  },
+  "Home": {
+    "tagline": "Chaque match NFL, expliqué en 60 secondes.",
+    "comingSoon": "Un pronostic pour chaque match, avec une probabilité de victoire et trois raisons claires. Lancement bientôt.",
+    "principle1": "Un pronostic et une probabilité de victoire pour chaque match",
+    "principle2": "Trois raisons, tirées uniquement des vraies données du modèle",
+    "principle3": "Un bilan public de chaque pronostic, victoires et défaites comprises"
+  },
+  "Footer": {
+    "disclaimer": "EndzoneIQ est un service d'analyse indépendant, non affilié à la NFL ni à aucune équipe, et non approuvé par elles.",
+    "entertainment": "À des fins de divertissement et d'information. Ceci n'est pas un conseil de pari."
+  },
+  "Theme": {
+    "toggle": "Changer le thème"
+  },
+  "Locale": {
+    "label": "Langue",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  }
+}
