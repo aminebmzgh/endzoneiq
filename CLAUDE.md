@@ -18,7 +18,7 @@ in `BACKLOG.md`, never into the code.
 | 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
 | 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)        |
 | 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations     |
-| 4 Public web app  | ✅ Done 2026-11-07. Home/week/game/record/team pages, grading, SEO, caching   |
+| 4 Public web app  | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
 | 5–8               | Not started                                                                   |
 
 ## Stack
@@ -262,7 +262,15 @@ re-uploads a previous run's artifact.
     `components/after-kickoff.tsx`; kickoff times render in the visitor's time zone via
     `components/local-time.tsx` (Eastern on the server).
   - Measured locally (warm): 146 req/s at 50 users, p95 473 ms; before (per-request
-    rendering) 18 req/s, p95 6 s.
+    rendering) 18 req/s, p95 6 s. Production, 50 users from Europe: 0 errors, p95 863 ms.
+- **2026-11-07 Client JavaScript is kept minimal** (Lighthouse TBT): no next-intl in the
+  browser (server `components/locale-link.tsx`, translated props, no
+  NextIntlClientProvider), one `LocalTimes` rewriter for all kickoff times, no prefetch on
+  header/week links. Lighthouse: accessibility, best practices and SEO are 100. Mobile
+  performance measured 77–97 on the dev machine, which is too slow for Lighthouse's 4x
+  CPU throttling (benchmark 750–1430). Confirm with `lighthouse.yml` (PageSpeed Insights;
+  set the `PSI_API_KEY` secret). GitHub runners can't run Lighthouse against production:
+  Hostinger's bot filter returns 403 to datacenter browsers.
 - **2026-11-07 Grading happens on the site** from stored scores, after every games ingest
   and via `ingest/results` (`grade_picks.yml`, Mon/Tue/Fri 07:00 UTC). Ties are
   `correct_winner = false` but shown as ties. ATS/totals are not tracked (no market
