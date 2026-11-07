@@ -40,7 +40,8 @@ jobs:
             # Warm the page cache first: a page renders once, then it's served from cache.
             curl -fsS -o /dev/null "$url"
             name=$(echo "$url" | sed 's|https\?://[^/]*/||; s|/|_|g')
-            lighthouse "$url" --quiet --chrome-flags="--headless=new --no-sandbox" \
+            # Headful Chrome on a virtual display: the host's bot filter rejects headless Chrome.
+            xvfb-run -a lighthouse "$url" --quiet --chrome-flags="--no-sandbox" \
               --emulated-user-agent="$UA" \
               --only-categories=performance,accessibility,best-practices,seo \
               --output=json --output=html --output-path="reports/$name"
