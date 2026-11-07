@@ -19,7 +19,7 @@ in `BACKLOG.md`, never into the code.
 | 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)          |
 | 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
 | 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
-| 5 Accounts and Pro | ✅ Code done 2026-11-07. Live Stripe test-mode flow waits for keys (see below)  |
+| 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)  |
 | 6–8                | Not started                                                                     |
 
 ## Stack
@@ -315,3 +315,8 @@ re-uploads a previous run's artifact.
   - The trial is offered once per account.
   - Cookie-authenticated POST/PATCH routes check `Origin` (`sameOrigin`).
   - Setup is in docs/deployment.md §5c.
+- **2026-11-07 Payments deferred** (the user may switch away from Stripe). The Stripe code is
+  isolated in `lib/billing/` (checkout, portal, webhook sync); the rest of the app only
+  reads `profiles.plan`. Until billing env vars exist, `/api/me` reports `billing: false`
+  and the pricing page says Pro opens soon. Phase 5 acceptance (test-mode
+  purchase/upgrade/cancel) is still open.

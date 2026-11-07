@@ -3,6 +3,7 @@ import { z } from "zod";
 import { routing } from "@/i18n/routing";
 import { authConfigured, googleConfigured } from "@/lib/auth";
 import { canViewFullBreakdown, canViewProContent, getViewer, type Viewer } from "@/lib/authz";
+import { billingConfigured } from "@/lib/billing/stripe";
 import { getProDetail } from "@/lib/site/data";
 
 const noStore = { "Cache-Control": "private, no-store" };
@@ -60,11 +61,12 @@ export function meHandler(deps: Pick<Deps, "viewer"> = defaults) {
   return async (req: Request): Promise<Response> => {
     const v = await deps.viewer(req);
     const providers = { email: authConfigured(), google: authConfigured() && googleConfigured() };
+    const billing = billingConfigured();
     return json(
       200,
       v
-        ? { signedIn: true, plan: v.plan, admin: v.role === "admin", providers }
-        : { signedIn: false, providers },
+        ? { signedIn: true, plan: v.plan, admin: v.role === "admin", providers, billing }
+        : { signedIn: false, providers, billing },
     );
   };
 }

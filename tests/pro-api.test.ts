@@ -80,6 +80,10 @@ describe("/api/me", () => {
     const anon = await (
       await meHandler({ viewer: async () => null })(new Request("http://localhost/api/me"))
     ).json();
-    expect(anon).toMatchObject({ signedIn: false, providers: { email: true, google: false } });
+    expect(anon).toMatchObject({
+      signedIn: false,
+      providers: { email: true, google: false },
+      billing: false,
+    });
   });
 });

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Me = { signedIn: boolean; plan?: "free" | "pro" };
+type Me = { signedIn: boolean; plan?: "free" | "pro"; billing?: boolean };
 
 /**
  * Start Stripe Checkout. Not signed in: go to sign-in and come back here. Already Pro:
@@ -39,6 +39,14 @@ export function CheckoutButtons({
     return (
       <p className="rounded-md border border-accent px-3 py-2 text-center text-sm font-medium">
         {labels.current}
+      </p>
+    );
+  }
+
+  if (me && !me.billing) {
+    return (
+      <p className="rounded-md border border-border px-3 py-2 text-center text-sm text-muted-foreground">
+        {labels.unavailable}
       </p>
     );
   }
