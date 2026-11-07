@@ -19,6 +19,7 @@ push to main ─► CI (lint, types, vitest + MariaDB, ruff, pytest)
 4. [Day-to-day deploys and rollback](#4-day-to-day-deploys-and-rollback)
 5. [Database migrations](#5-database-migrations)
    - [5b. Data pipeline](#5b-data-pipeline-github-actions--internal-api)
+   - [5c. Sign-in, email and payments](#5c-sign-in-email-and-payments-phase-5)
 6. [Cron jobs (hPanel)](#6-cron-jobs-hpanel)
 7. [Fallback if Hostinger rejects the prebuilt package](#7-fallback-if-hostinger-rejects-the-prebuilt-package)
 8. [Upgrade path](#8-upgrade-path)
@@ -231,6 +232,57 @@ The pipeline never connects to MySQL. It posts to `/api/internal/*`, signed with
   written again.
 - Every run compares a per-season digest from the site with one computed from nflverse and
   fails on any mismatch. Each run is recorded in `pipeline_runs`, each API call in `ingest_log`.
+
+## 5c. Sign-in, email and payments (Phase 5)
+
+All of these are hPanel environment variables (runtime only, never GitHub). Until they're set
+the site works as before: sign-in says it isn't available yet (`/api/auth` answers 503) and
+the pricing buttons say payments aren't available (`/api/billing/*` answer 503).
+
+**Auth (Better Auth).**
+
+- `BETTER_AUTH_SECRET`: `openssl rand -hex 32`. Changing it signs everyone out.
+- `BETTER_AUTH_URL=https://endzoneiq.com`
+- `ADMIN_EMAILS`: comma-separated; these accounts get the admin role.
+
+**Google sign-in (optional).** Google Cloud console → APIs & Services → Credentials →
+OAuth client ID (type "Web application").
+
+- Authorized JavaScript origin: `https://endzoneiq.com`.
+- Authorized redirect URI: `https://endzoneiq.com/api/auth/callback/google`.
+- Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Without them only the email link is shown.
+
+**Email (Resend), for magic links.**
+
+1. resend.com → Domains → add `endzoneiq.com`.
+2. Add the DNS records Resend shows (SPF/DKIM on a `send` subdomain) in Hostinger DNS.
+3. Wait until the domain is verified.
+4. Set `RESEND_API_KEY` and `EMAIL_FROM` (for example `EndzoneIQ <hello@endzoneiq.com>`).
+
+**Stripe.** Start in test mode, then repeat with live keys.
+
+1. Product "EndzoneIQ Pro" with two recurring prices: $7.99 / month and $39.99 / year (the
+   season pass renews each year).
+   - Their ids go in `STRIPE_PRICE_PRO_MONTHLY` and `STRIPE_PRICE_PRO_SEASON`.
+   - The prices shown on `/pricing` come from `messages/*.json` ("Pricing"); keep them in sync.
+2. Developers → Webhooks → endpoint `https://endzoneiq.com/api/stripe/webhook`.
+   - Events: `checkout.session.completed`, `customer.subscription.created`,
+     `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+   - Its signing secret is `STRIPE_WEBHOOK_SECRET`.
+3. Settings → Billing → Customer portal: allow cancelling, switching between the two prices and
+   updating the payment method.
+4. Set `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. The publishable key is
+   unused for now; Checkout is a redirect.
+
+How it fits together:
+
+- The 7-day trial is offered on a user's first subscription only.
+- `profiles.plan` is derived by the webhook from `subscriptions`. Statuses `trialing`,
+  `active` and `past_due` keep Pro, so a failed card keeps access while Stripe retries.
+- Webhooks are idempotent: event ids are stored in `stripe_events`, and older events never
+  overwrite newer state.
+- Test a webhook locally with
+  `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 
 ## 6. Cron jobs (hPanel)
 

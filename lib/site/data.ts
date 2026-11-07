@@ -29,6 +29,7 @@ import {
 } from "@/db/schema";
 import { tags } from "@/lib/cache-tags";
 import { getDb } from "@/lib/db";
+import { freeBreakdownIds } from "./free-games";
 import { outcome } from "./record";
 import type { ChainHead, GameDetail, GameSummary, RecordRow, TeamStats, WeekRef } from "./types";
 
@@ -76,7 +77,20 @@ function summarySelect(locale: Locale) {
 
 type SummaryRow = Awaited<ReturnType<ReturnType<typeof summarySelect>["execute"]>>[number];
 
-function toSummary(r: SummaryRow): GameSummary {
+/** The free full-breakdown games of every week of a season (see free-games.ts). */
+async function seasonFreeIds(season: number): Promise<Set<string>> {
+  const rows = await getDb()
+    .select({ id: games.id, week: games.week, kickoffAt: games.kickoffAt })
+    .from(games)
+    .where(eq(games.season, season));
+  const byWeek = new Map<number, typeof rows>();
+  for (const r of rows) byWeek.set(r.week, [...(byWeek.get(r.week) ?? []), r]);
+  const free = new Set<string>();
+  for (const week of byWeek.values()) for (const id of freeBreakdownIds(week)) free.add(id);
+  return free;
+}
+
+function toSummary(r: SummaryRow, free: Set<string>): GameSummary {
   const pickedHome = r.pickWinnerId === r.homeTeamId;
   return {
     id: r.id,
@@ -92,6 +106,7 @@ function toSummary(r: SummaryRow): GameSummary {
     away: r.away,
     venue: r.venue,
     neutralSite: r.neutralSite,
+    freeBreakdown: free.has(r.id),
     // Inside "use cache": part of the cached result, refreshed with it.
     kickedOff: r.kickoffAt.getTime() <= Date.now(),
     pick:
@@ -153,7 +168,8 @@ export async function getWeekGames(
   const rows = await summarySelect(locale)
     .where(and(eq(games.season, season), eq(games.week, week)))
     .orderBy(asc(games.kickoffAt), asc(games.id));
-  return rows.map(toSummary);
+  const free = freeBreakdownIds(rows);
+  return rows.map((r) => toSummary(r, free));
 }
 
 export async function getGame(slug: string, locale: Locale): Promise<GameDetail | null> {
@@ -225,7 +241,7 @@ export async function getGame(slug: string, locale: Locale): Promise<GameDetail 
   }
 
   return {
-    ...toSummary(row),
+    ...toSummary(row, await seasonFreeIds(row.season)),
     stadium: stadium[0] ?? null,
     explanation: expl[0] ?? null,
     versions: versions.map((v) => ({ ...v, publishedAt: iso(v.publishedAt) })),
@@ -311,7 +327,8 @@ export async function getTeamSeason(
   const rows = await summarySelect(locale)
     .where(and(eq(games.season, season), or(eq(home.abbr, abbr), eq(away.abbr, abbr))))
     .orderBy(asc(games.kickoffAt));
-  return rows.map(toSummary);
+  const free = await seasonFreeIds(season);
+  return rows.map((r) => toSummary(r, free));
 }
 
 /** Latest Elo and season-to-date efficiency for a team (posted by the pipeline). */
@@ -348,4 +365,63 @@ export async function getPublishedGames(): Promise<{ slug: string; publishedAt: 
     .groupBy(games.slug)
     .orderBy(desc(sql`MAX(${picks.publishedAt})`));
   return rows.map((r) => ({ slug: r.slug, publishedAt: iso(new Date(r.publishedAt)) }));
+}
+
+/**
+ * Everything the gated Pro API may return for a game (current pick). Cached like the
+ * rest; the route decides with lib/authz.ts what the viewer may see.
+ */
+export async function getProDetail(slug: string, locale: Locale) {
+  cacheLife("hours");
+  const [row] = await getDb()
+    .select({
+      id: games.id,
+      season: games.season,
+      week: games.week,
+      home: home.abbr,
+      away: away.abbr,
+      predSpread: picks.predSpread,
+      predTotal: picks.predTotal,
+      shap: picks.shapJson,
+      reasons: explanations.reasonsJson,
+      matchupNotes: explanations.matchupNotesJson,
+    })
+    .from(games)
+    .innerJoin(home, eq(home.id, games.homeTeamId))
+    .innerJoin(away, eq(away.id, games.awayTeamId))
+    .innerJoin(picks, and(eq(picks.gameId, games.id), eq(picks.isCurrent, true)))
+    .leftJoin(explanations, and(eq(explanations.pickId, picks.id), eq(explanations.locale, locale)))
+    .where(eq(games.slug, slug))
+    .limit(1);
+  if (!row) {
+    cacheTag(tags.picks);
+    return null;
+  }
+  cacheTag(tags.game(row.id), tags.picks, tags.games);
+  const week = await getDb()
+    .select({ id: games.id, kickoffAt: games.kickoffAt })
+    .from(games)
+    .where(and(eq(games.season, row.season), eq(games.week, row.week)));
+  return {
+    gameId: row.id,
+    home: row.home,
+    away: row.away,
+    freeBreakdown: freeBreakdownIds(week).has(row.id),
+    reasons: row.reasons ?? [],
+    matchupNotes: row.matchupNotes ?? [],
+    predSpread: row.predSpread,
+    predTotal: row.predTotal,
+    shap: row.shap as unknown as ProShap,
+  };
+}
+
+export interface ProDriver {
+  concept: string;
+  label: string;
+  impact: number;
+}
+export interface ProShap {
+  pick: "home" | "away";
+  for: ProDriver[];
+  against: ProDriver[];
 }

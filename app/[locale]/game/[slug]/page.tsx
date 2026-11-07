@@ -7,6 +7,7 @@ import { AfterKickoff } from "@/components/after-kickoff";
 import { LocalTime } from "@/components/local-time";
 import { OutcomeBadge, TeamSwatch, TierBadge, UpdatedBadge } from "@/components/picks/badges";
 import { ProbabilityBar } from "@/components/picks/probability-bar";
+import { ProPanel } from "@/components/pro/pro-panel";
 import { Link } from "@/components/locale-link";
 import type { Locale } from "@/i18n/routing";
 import { getGame } from "@/lib/site/data";
@@ -17,6 +18,25 @@ import type { GameDetail, PickVersion } from "@/lib/site/types";
 type Props = PageProps<"/[locale]/game/[slug]">;
 
 const SLUG = /^[a-z0-9-]{8,64}$/;
+
+/** SHAP concepts the model reports (pipeline model/explain.py), named in messages "Drivers". */
+const DRIVER_CONCEPTS = [
+  "home_field",
+  "team_strength",
+  "qb_change",
+  "efficiency",
+  "pass_matchup",
+  "run_matchup",
+  "big_plays",
+  "turnovers",
+  "injuries",
+  "rest",
+  "travel",
+  "venue",
+  "rivalry",
+  "playoffs",
+  "weather",
+] as const;
 
 /** Served as a static page from cache, refreshed when its data's cache tags are revalidated. */
 export const ensureStatic = "navigation";
@@ -145,10 +165,12 @@ async function GameContent({ params }: { params: Props["params"] }) {
   const game = await getGame(slug, locale);
   if (!game) notFound();
 
-  const [t, tc, tw] = await Promise.all([
+  const [t, tc, tw, tp, td] = await Promise.all([
     getTranslations({ locale, namespace: "Game" }),
     getTranslations({ locale, namespace: "Card" }),
     getTranslations({ locale, namespace: "Week" }),
+    getTranslations({ locale, namespace: "Pro" }),
+    getTranslations({ locale, namespace: "Drivers" }),
   ]);
   const round = roundLabel(tw, game.gameType, game.week);
   const { pick, explanation } = game;
@@ -260,29 +282,62 @@ async function GameContent({ params }: { params: Props["params"] }) {
 
       {pick && picked && explanation && (
         <>
+          {/* Cached HTML: all reasons on the week's free games, the top reason otherwise.
+              The rest is authorized per viewer by /api/pro/game (ProPanel). */}
           <Section title={t("reasons", { team: picked.name })}>
             <ol className="space-y-3">
-              {explanation.reasons.map((r, i) => (
-                <li key={i} className="flex gap-3">
-                  <span
-                    aria-hidden
-                    className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent"
-                  >
-                    {i + 1}
-                  </span>
-                  <span>{r}</span>
-                </li>
-              ))}
+              {(game.freeBreakdown ? explanation.reasons : explanation.reasons.slice(0, 1)).map(
+                (r, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span
+                      aria-hidden
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent"
+                    >
+                      {i + 1}
+                    </span>
+                    <span>{r}</span>
+                  </li>
+                ),
+              )}
             </ol>
+            {game.freeBreakdown && (
+              <p className="mt-3 text-xs text-muted-foreground">{tp("freeGame")}</p>
+            )}
           </Section>
-          <Section title={t("matchup")}>
-            <ul className="list-disc space-y-2 pl-5">
-              {explanation.matchupNotes.map((n, i) => (
-                <li key={i}>{n}</li>
-              ))}
-            </ul>
-            <p className="mt-4 text-xs text-muted-foreground">{t("modelNote")}</p>
-          </Section>
+          {game.freeBreakdown && (
+            <Section title={t("matchup")}>
+              <ul className="list-disc space-y-2 pl-5">
+                {explanation.matchupNotes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-muted-foreground">{t("modelNote")}</p>
+            </Section>
+          )}
+          <ProPanel
+            slug={game.slug}
+            locale={locale}
+            freeBreakdown={game.freeBreakdown}
+            labels={{
+              reasonsHeading: t("reasons", { team: picked.name }),
+              matchupHeading: t("matchup"),
+              modelNote: t("modelNote"),
+              locked: tp("locked"),
+              unlock: tp("unlock"),
+              heading: tp("heading"),
+              teaser: tp("teaser"),
+              margin: tp("margin"),
+              marginValue: tp.raw("marginValue") as string,
+              total: tp("total"),
+              totalValue: tp.raw("totalValue") as string,
+              drivers: tp("drivers"),
+              driversHelp: tp("driversHelp"),
+              forPick: tp("forPick"),
+              againstPick: tp("againstPick"),
+              concepts: Object.fromEntries(DRIVER_CONCEPTS.map((c) => [c, td(c)])),
+              teams: { [game.home.abbr]: game.home.name, [game.away.abbr]: game.away.name },
+            }}
+          />
         </>
       )}
 

@@ -48,6 +48,8 @@ export interface GameSummary {
    * stale). Cards use it; the game page re-checks in the browser.
    */
   kickedOff: boolean;
+  /** One of the week's free full-breakdown games (lib/site/free-games.ts). */
+  freeBreakdown: boolean;
   pick: PickSummary | null;
 }
 

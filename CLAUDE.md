@@ -12,14 +12,15 @@ in `BACKLOG.md`, never into the code.
 
 ## Status
 
-| Phase             | Status                                                                          |
-| ----------------- | ------------------------------------------------------------------------------- |
-| 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions   |
-| 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested    |
-| 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)          |
-| 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
-| 4 Public web app  | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
-| 5–8               | Not started                                                                     |
+| Phase              | Status                                                                          |
+| ------------------ | ------------------------------------------------------------------------------- |
+| 0 Setup            | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions   |
+| 1 Data foundation  | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested    |
+| 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)          |
+| 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
+| 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
+| 5 Accounts and Pro | ✅ Code done 2026-11-07. Live Stripe test-mode flow waits for keys (see below)  |
+| 6–8                | Not started                                                                     |
 
 ## Stack
 
@@ -42,13 +43,17 @@ app/[locale]/        localized pages (root layout lives here; html lang = locale
 app/sitemap.ts, app/robots.ts, app/[locale]/**/opengraph-image.tsx   SEO
 app/api/             route handlers (/api/health; /api/internal/* re-export lib/internal/handlers)
 components/          UI components (picks/: game card, badges, week view; views/: home,
-                     record; record/: filter table; local-time, after-kickoff)
+                     record; record/: filter table; local-time, after-kickoff; pro/: Pro
+                     panel; auth/, account/, pricing/: client forms; account-button)
 i18n/                next-intl routing, request config, navigation helpers
 messages/            en.json, fr.json, es.json (keys must match; tested)
 lib/                 server code: env.ts (zod, server-only), db/, health.ts, cache-tags.ts,
                      internal/ (HMAC, rate limit, internalRoute wrapper, handlers), games/,
                      picks/ (append-only repository, hash chain, grading),
-                     site/ (cached public reads `data.ts`, record stats, labels, SEO)
+                     site/ (cached public reads `data.ts`, record stats, labels, SEO,
+                     free-games), auth.ts (Better Auth), authz.ts (every permission rule),
+                     billing/ (Stripe checkout, portal, webhook sync), pro/ (gated API),
+                     account.ts, email.ts (Resend)
 db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams.json, stadiums.json),
                      migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
@@ -279,3 +284,26 @@ re-uploads a previous run's artifact.
   `grade_picks` to `ingest/team-stats` (computed by `model/team_stats.py`).
 - **2026-11-07 Team colors appear only as small swatches**; probability bars use the accent
   color for the pick, so dark team colors stay readable in dark mode. No logos.
+- **2026-11-07 Auth = Better Auth 1.7** (magic link via Resend + Google), sessions in MySQL.
+  Its core tables are hand-written in `db/schema.ts` (snake_case columns, Better Auth
+  property names); `tests/auth.test.ts` signs in end to end to prove the mapping. Every
+  user gets a `profiles` row (database hook); `ADMIN_EMAILS` get the admin role. Auth is
+  created lazily (`getAuth()`), so the build needs no secret; without one, `/api/auth`
+  answers 503.
+- **2026-11-07 No auth or i18n code in the browser.** Pages stay cached HTML shared by
+  everyone. Per-viewer parts are small client components that call `/api/me` and
+  `/api/pro/game`; sign-in posts to Better Auth's endpoints with plain `fetch`.
+- **2026-11-07 Free plan "3 full breakdowns a week" = the week's 3 night games** (latest
+  US Eastern kickoff times: normally Thursday, Sunday and Monday night;
+  `lib/site/free-games.ts`). The same for everyone, needs no account (spec: "no wall"), and
+  keeps those breakdowns cached and indexable. On the other games the HTML has only the top
+  reason; reasons 2–3, matchup notes and the Pro projections (margin, total, SHAP drivers)
+  come from `/api/pro/game`, gated by `lib/authz.ts`.
+- **2026-11-07 Billing:** Stripe Checkout (subscription mode for both prices; the season pass
+  is a yearly price), Customer Portal and webhooks. `profiles.plan` is only ever set by the
+  webhook sync (Pro = `trialing`, `active` or `past_due`).
+  - Webhooks are idempotent through `stripe_events` (in the same transaction) and
+    order-safe through `subscriptions.event_created_at`.
+  - The trial is offered once per account.
+  - Cookie-authenticated POST/PATCH routes check `Origin` (`sameOrigin`).
+  - Setup is in docs/deployment.md §5c.

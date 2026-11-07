@@ -1,6 +1,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/components/locale-link";
 import type { Locale } from "@/i18n/routing";
+import { AccountButton } from "./account-button";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -13,6 +14,7 @@ export function SiteHeader() {
     { href: "/", label: t("thisWeek") },
     { href: "/record", label: t("record") },
     { href: "/teams", label: t("teams") },
+    { href: "/pricing", label: t("pricing") },
   ] as const;
   return (
     <header className="border-b border-border">
@@ -23,6 +25,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <LocaleSwitcher label={tl("label")} locale={locale} />
           <ThemeToggle label={tt("toggle")} />
+          <AccountButton locale={locale} labels={{ signIn: t("signIn"), account: t("account") }} />
         </div>
       </div>
       <nav aria-label={t("label")} className="mx-auto w-full max-w-5xl overflow-x-auto px-4">
