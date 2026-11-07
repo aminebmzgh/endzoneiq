@@ -162,11 +162,9 @@ async function Admin({ email }: { email: string }) {
 }
 
 /**
- * Checks access before rendering anything, so non-admins get a real 404 (status and
- * body) and never see that the page exists. Blocking on purpose: an internal page.
+ * Admins only. Anonymous requests are answered 404 by proxy.ts before rendering; a
+ * signed-in non-admin gets the not-found page from the check below.
  */
-export const instant = false;
-
 export default async function AdminPage() {
   const viewer = await getViewer(await headers());
   if (!isAdmin(viewer)) notFound();

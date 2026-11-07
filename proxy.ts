@@ -12,8 +12,17 @@ const VIEW_ROUTES: [RegExp, string][] = [
 ];
 const INTERNAL = new RegExp(`^/(${LOCALES})/ez-view(/|$)`);
 
+/** Better Auth's session cookie (the __Secure- prefix is used over HTTPS). */
+const SESSION_COOKIES = ["better-auth.session_token", "__Secure-better-auth.session_token"];
+
 export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // The admin area: no session, no page (real 404, nothing rendered). The page itself
+  // checks the admin role; this only keeps anonymous visitors out cheaply.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const hasSession = SESSION_COOKIES.some((c) => req.cookies.has(c));
+    return hasSession ? NextResponse.next() : new NextResponse("Not found", { status: 404 });
+  }
   // The internal route is only reachable through the rewrite below.
   if (INTERNAL.test(pathname)) {
     return new NextResponse("Not found", { status: 404 });
@@ -30,6 +39,6 @@ export default function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Localize everything except API routes, the admin area, Next internals and static files.
-  matcher: ["/((?!api|admin|icon|_next|_vercel|.*\\..*).*)"],
+  // Everything except API routes, Next internals and static files (admin: see above).
+  matcher: ["/((?!api|icon|_next|_vercel|.*\\..*).*)"],
 };
