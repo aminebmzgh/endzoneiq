@@ -7,6 +7,7 @@ import { routing } from "@/i18n/routing";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { LocalTimes } from "@/components/local-times";
 import "../globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
+          <LocalTimes />
         </ThemeProvider>
       </body>
     </html>

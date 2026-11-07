@@ -1,10 +1,11 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
 const EASTERN = "America/New_York";
 
-function format(iso: string, locale: string, timeZone?: string, withDate = true): string {
+export function formatKickoff(
+  iso: string,
+  locale: string,
+  timeZone: string | undefined,
+  withDate: boolean,
+): string {
   return new Intl.DateTimeFormat(locale, {
     ...(withDate ? { weekday: "short", month: "short", day: "numeric" } : {}),
     hour: "numeric",
@@ -15,8 +16,9 @@ function format(iso: string, locale: string, timeZone?: string, withDate = true)
 }
 
 /**
- * Kickoff in the visitor's own time zone. The server (and the cached HTML) render
- * US Eastern time, the NFL's reference zone; the browser swaps in local time.
+ * A date/time in US Eastern time (the NFL's reference zone) in the cached HTML.
+ * `LocalTimes` (one client component in the layout) rewrites every one of these to
+ * the visitor's own time zone after hydration, instead of one client island each.
  */
 export function LocalTime({
   iso,
@@ -29,14 +31,15 @@ export function LocalTime({
   withDate?: boolean;
   className?: string;
 }) {
-  const [text, setText] = useState(() => format(iso, locale, EASTERN, withDate));
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only time zone
-    setText(format(iso, locale, undefined, withDate));
-  }, [iso, locale, withDate]);
   return (
-    <time dateTime={iso} className={className} suppressHydrationWarning>
-      {text}
+    <time
+      dateTime={iso}
+      data-local={withDate ? "datetime" : "time"}
+      data-locale={locale}
+      className={className}
+      suppressHydrationWarning
+    >
+      {formatKickoff(iso, locale, EASTERN, withDate)}
     </time>
   );
 }
