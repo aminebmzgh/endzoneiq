@@ -84,33 +84,34 @@ same time never see each other.
 
 |                                                              | Log loss   | Brier      | Accuracy  |
 | ------------------------------------------------------------ | ---------- | ---------- | --------- |
-| **Model**                                                    | **0.6339** | **0.2215** | **64.8%** |
+| **Model**                                                    | **0.6334** | **0.2212** | **64.9%** |
 | Elo only (logistic on Elo diff + neutral, refit each season) | 0.6368     | 0.2229     | 63.7%     |
 | Home team always                                             | 0.6892     | 0.2480     | 54.9%     |
 | Market favourite (reference only)                            | 0.6145     | 0.2131     | 66.1%     |
 
 The model beats the Elo-only baseline on log loss, Brier and accuracy. **The margin is
 small:** the paired 95% bootstrap interval for the per-game log-loss difference is
-[−0.0058, +0.0002], which just includes zero. It has the lower log loss in 7 of 12 test
-seasons, with its clearest gains in 2020 and 2023–2026. The betting market remains clearly
+[−0.0064, −0.0003]: it excludes zero, but only just. It has the lower log loss in 7 of 12
+test seasons, with its clearest gains in 2020 and 2023–2026. The betting market remains clearly
 better (as expected: closing lines carry information such as late injury news and expert
 judgment that free data doesn't).
 
 ### How the design was reached (all runs on the same test seasons)
 
 Hyperparameters were not grid-searched. The design changed four times after looking at
-backtest results. Every run is listed here, so no result is cherry-picked:
+backtest results, and run 5 fixed a data bug. Every run is listed here, so no result is cherry-picked:
 
-| Run | Change                                                                                                                     | Model log loss (Elo 0.6368) |
-| --- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 1   | LightGBM on all features; calibration and round count from one held-out season                                             | 0.6387                      |
-| 2   | Calibration and rounds pooled over 3 inner seasons; 5 leaves / 100 per leaf                                                | 0.6358                      |
-| 3   | Symmetric "scoring environment" features moved to the totals model only (they produced meaningless "reasons" for a winner) | 0.6382                      |
-| 4   | **Elo-anchored boosting** (`init_score`), kept the run-3 feature split                                                     | **0.6339**                  |
+| Run | Change                                                                                                                                | Model log loss (Elo 0.6368) |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| 1   | LightGBM on all features; calibration and round count from one held-out season                                                        | 0.6387                      |
+| 2   | Calibration and rounds pooled over 3 inner seasons; 5 leaves / 100 per leaf                                                           | 0.6358                      |
+| 3   | Symmetric "scoring environment" features moved to the totals model only (they produced meaningless "reasons" for a winner)            | 0.6382                      |
+| 4   | Elo-anchored boosting (`init_score`), kept the run-3 feature split                                                                    | 0.6339                      |
+| 5   | **Bug fix:** nflverse injury rows have no timestamp from 2025 on and were all being dropped; undated reports now count (see Injuries) | **0.6334**                  |
 
 Because these choices were made while looking at the same seasons, treat the reported edge
 over Elo as optimistic. The 2026 season to date is the closest thing to an untouched
-holdout; it shows 0.6374 vs 0.6468 over 121 games. New weeks will be tracked publicly
+holdout; it shows 0.6298 vs 0.6468 over 121 games (0.6374 before the run-5 fix). New weeks will be tracked publicly
 through the hash-chained track record.
 
 ## Explanations
@@ -120,7 +121,12 @@ Each prediction carries `shap_json`:
 - exact TreeSHAP values from LightGBM (`pred_contrib`), plus the Elo anchor's exact linear
   terms;
 - grouped into the concepts above and signed toward the picked team;
-- the top 3 supporting drivers and top 2 opposing ones.
+- the top 3 supporting drivers and top 2 opposing ones;
+- home-field advantage (the Elo anchor's intercept at non-neutral venues) as its own
+  driver;
+- never a factor at its neutral value (no QB change, equal injuries, not divisional, no
+  weather data). SHAP measures against an average game, so such factors get small
+  contributions that would read as misleading reasons. Their effect stays in `base`.
 
 This is the **only** factual input the AI explanation step may use (Phase 3). Share of
 average |contribution| for the current model on 2024–2026 games: team strength 57%, QB
@@ -132,7 +138,10 @@ others ≤ 2% each.
 - **Small edge over Elo.** Most of the signal is team strength. Free data lags real news;
   admin injury overrides (Phase 7) are meant to close part of that gap.
 - **Injuries** are weighted by position only, not by player quality, so losing a backup
-  CB counts the same as losing a starter. Players on IR aren't on reports and are only
+  CB counts the same as losing a starter. nflverse injury rows have no `date_modified` from
+  2025 on. Undated Out/Doubtful statuses come from the final pre-game report, so they are
+  treated as published 24 hours before kickoff; rows that do carry a timestamp after
+  kickoff are still ignored. Players on IR aren't on reports and are only
   captured indirectly, through team stats.
 - **The QB starter** for past games is the one who actually started. That is known before
   kickoff in practice, but late surprise changes are counted as known. For upcoming games

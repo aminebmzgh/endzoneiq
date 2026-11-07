@@ -7,4 +7,6 @@ export const tags = {
   season: (year: number) => `season-${year}`,
   seasons: "seasons",
   model: "model",
+  picks: "picks",
+  game: (id: string) => `game-${id}`,
 } as const;

@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: "node",
+    // Integration tests share one MariaDB test database (and one resets append-only
+    // tables), so test files run one at a time.
+    fileParallelism: false,
     // Loads .env / .env.local so DB integration tests find the local docker MariaDB.
     env: loadEnv(mode, process.cwd(), ""),
     include: ["**/*.test.ts"],

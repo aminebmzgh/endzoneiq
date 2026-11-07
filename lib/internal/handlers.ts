@@ -18,7 +18,8 @@ import { serverEnv } from "@/lib/env";
 import { gamesDigest } from "@/lib/games/digest";
 import { seasonDigestRows, upsertGames, upsertSeasons } from "@/lib/games/repository";
 import { InternalApiError, internalRoute } from "./route";
-import { ingestGamesBody, modelVersionBody, pipelineRunBody } from "./schemas";
+import { publishPicks } from "@/lib/picks/repository";
+import { ingestGamesBody, ingestPicksBody, modelVersionBody, pipelineRunBody } from "./schemas";
 
 /**
  * Handlers for /api/internal/*. Route files under app/api/internal only
@@ -93,7 +94,7 @@ export const pipelineRun = internalRoute(
 export const exportState = internalRoute({ endpoint: "export" }, async () => {
   const db = getDb();
   const now = new Date();
-  const [seasonRows, overrides, currentPicks] = await Promise.all([
+  const [seasonRows, overrides, currentPicks, [activeModel]] = await Promise.all([
     db.select().from(seasons),
     db
       .select({
@@ -118,12 +119,18 @@ export const exportState = internalRoute({ endpoint: "export" }, async () => {
       .innerJoin(games, eq(games.id, picks.gameId))
       .innerJoin(teams, eq(teams.id, picks.winnerTeamId))
       .where(and(eq(picks.isCurrent, true), gt(games.kickoffAt, now))),
+    db
+      .select({ name: modelVersions.name, artifactUrl: modelVersions.artifactUrl })
+      .from(modelVersions)
+      .where(eq(modelVersions.isActive, true))
+      .limit(1),
   ]);
   return {
     rows: 0,
     data: {
       generatedAt: now.toISOString(),
       featureFlags: { odds: serverEnv().FEATURE_ODDS },
+      activeModel: activeModel ?? null,
       seasons: seasonRows.map(({ year, currentWeek, phase }) => ({ year, currentWeek, phase })),
       injuryOverrides: overrides,
       currentPicks,
@@ -176,5 +183,35 @@ export const ingestModelVersion = internalRoute(
         data: { id, name: body.name, created, activated },
       };
     });
+  },
+);
+
+/**
+ * POST /api/internal/ingest/picks: submit predictions with SHAP and EN/FR/ES
+ * explanations. The site decides per game whether this is a new version (first
+ * pick, winner changed, or win probability moved >= 5 points). Games that have
+ * kicked off are locked: their picks can never change.
+ */
+export const ingestPicks = internalRoute(
+  { endpoint: "ingest/picks", schema: ingestPicksBody },
+  async ({ body }) => {
+    const { results, chainHead } = await publishPicks(body.modelVersion, body.picks);
+    const created = results.filter((r) => r.status === "created");
+    if (created.length > 0) {
+      revalidateTag(tags.picks, "max");
+      for (const r of created) revalidateTag(tags.game(r.gameId), "max");
+    }
+    const count = (s: string) => results.filter((r) => r.status === s).length;
+    return {
+      rows: created.length,
+      data: {
+        created: created.length,
+        unchanged: count("unchanged"),
+        locked: count("locked"),
+        unknownGames: count("unknown_game"),
+        chainHead,
+        results,
+      },
+    };
   },
 );

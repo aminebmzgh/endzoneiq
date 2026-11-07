@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { gameStatuses, gameTypes, pipelineRunStatuses, seasonPhases } from "@/db/schema";
+import {
+  confidenceTiers,
+  explanationSources,
+  gameStatuses,
+  gameTypes,
+  pipelineRunStatuses,
+  seasonPhases,
+} from "@/db/schema";
 
 export const MAX_GAMES_PER_REQUEST = 500;
 
@@ -63,4 +70,44 @@ export const modelVersionBody = z.object({
   artifactUrl: z.url().max(512).nullable().optional(),
   /** Make this the version used for new picks (exactly one version is active). */
   activate: z.boolean().default(false),
+});
+
+// --- Picks (spec 8 + 10.1) ---------------------------------------------------
+
+export const MAX_PICKS_PER_REQUEST = 64;
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+const sentence = (maxWords: number, maxChars: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(maxChars)
+    .refine((s) => words(s) <= maxWords, { message: `at most ${maxWords} words` });
+
+/** Same rules as the pipeline's pydantic Explanation, enforced again here. */
+export const explanationInput = z.object({
+  headline: z.string().trim().min(1).max(160),
+  reasons: z.array(sentence(20, 200)).length(3),
+  matchupNotes: z.array(sentence(40, 300)).min(1).max(3),
+  source: z.enum(explanationSources),
+});
+
+export const pickInput = z.object({
+  gameId: z.string().regex(/^\d{4}_\d{2}_[A-Z]{2,3}_[A-Z]{2,3}$/),
+  /** Calibrated P(home team wins); the site derives the winner from it. */
+  homeWinProb: z.number().min(0).max(1),
+  tier: z.enum(confidenceTiers),
+  /** Projected home margin in points. */
+  predMargin: z.number().min(-100).max(100),
+  predTotal: z.number().min(0).max(200),
+  features: z.record(z.string(), z.number().nullable()),
+  shap: z.record(z.string(), z.unknown()),
+  changeReason: z.string().trim().min(1).max(255).optional(),
+  explanations: z.object({ en: explanationInput, fr: explanationInput, es: explanationInput }),
+});
+export type PickInput = z.infer<typeof pickInput>;
+
+export const ingestPicksBody = z.object({
+  modelVersion: modelVersionBody.shape.name,
+  picks: z.array(pickInput).min(1).max(MAX_PICKS_PER_REQUEST),
 });

@@ -1,0 +1,80 @@
+# Weekly picks (spec 12.1): predict the next week, write EN/FR/ES explanations with
+# Claude (template fallback), and publish through the signed internal API.
+#
+# Published picks are permanent (append-only, hash-chained), so posting is gated by
+# the repository variable PUBLISH_ENABLED=true. Without it every run is a dry run:
+# picks are built and uploaded as an artifact, nothing is published.
+name: Publish week
+
+on:
+  schedule:
+    - cron: "0 15 * * 2" # Tuesday 10:00 US Eastern (EST); 11:00 during EDT
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season (empty = next week with games)"
+        required: false
+        default: ""
+      week:
+        description: "Week (with season)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Build picks without publishing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-week
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Predict, explain, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_MODEL_FAST: ${{ vars.CLAUDE_MODEL_FAST }}
+      PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.cache/nflverse
+          key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
+          restore-keys: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-
+      - run: uv sync --locked --no-dev
+
+      - name: Build and publish picks
+        env:
+          SEASON: ${{ inputs.season }}
+          WEEK: ${{ inputs.week }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || vars.PUBLISH_ENABLED != 'true' }}
+        run: |
+          args=(--out picks.json)
+          [[ -n "$SEASON" && -n "$WEEK" ]] && args+=(--season "$SEASON" --week "$WEEK")
+          if [[ "$DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
+            echo "Dry run: picks are built but not published."
+          fi
+          uv run --no-dev python -m endzoneiq_pipeline.jobs.publish_week "${args[@]}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: picks
+          path: pipeline/picks.json
+          if-no-files-found: ignore

@@ -59,40 +59,69 @@ def contributions(bundle: ModelBundle, df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+HOME_FIELD = ("home_field", "Home-field advantage")
+
+
+def _informative(concept: str, feature_row: pd.Series) -> bool:
+    """False when a concept's inputs are all at their neutral value for this game.
+
+    SHAP measures each feature against an average game, so "no QB change" or "equal
+    injuries" still gets a small contribution. Those are not reasons a fan would
+    recognise, so they are never shown as drivers (their effect stays in `base`).
+    """
+    vals = {f: feature_row[f] for f in CONCEPTS[concept][1]}
+    known = {f: float(v) for f, v in vals.items() if not pd.isna(v)}
+    if concept == "weather":
+        return known.get("indoor", 0.0) == 1.0 or "wind_kph" in known or "temp_c" in known
+    return any(abs(v) > 1e-9 for v in known.values())
+
+
 def shap_json(
     contrib_row: pd.Series,
     feature_row: pd.Series,
     pick_home: bool,
     *,
+    home_field: float = 0.0,
     top_for: int = 3,
     top_against: int = 2,
 ) -> dict[str, Any]:
-    """Drivers for one game, signed toward the picked team (positive = supports the pick)."""
+    """Drivers for one game, signed toward the picked team (positive = supports the pick).
+
+    `home_field` is the log-odds the model gives the home team at a non-neutral venue
+    (the Elo anchor's intercept); it is shown as its own driver and taken out of `base`.
+    """
     sign = 1.0 if pick_home else -1.0
     by_concept: dict[str, float] = {}
     for f in WIN_FEATURES:
         c = _FEATURE_CONCEPT[f]
         by_concept[c] = by_concept.get(c, 0.0) + sign * float(contrib_row[f])
+    shown = {c: v for c, v in by_concept.items() if _informative(c, feature_row)}
+    if home_field:
+        shown[HOME_FIELD[0]] = sign * home_field
 
     def driver(concept: str) -> dict[str, Any]:
-        label, feats = CONCEPTS[concept]
+        if concept == HOME_FIELD[0]:
+            label, feats = HOME_FIELD[1], ["neutral"]
+        else:
+            label, feats = CONCEPTS[concept]
         return {
             "concept": concept,
             "label": label,
-            "impact": round(by_concept[concept], 4),
+            "impact": round(shown[concept], 4),
             "features": {
                 f: (None if pd.isna(feature_row[f]) else round(float(feature_row[f]), 4))
                 for f in feats
             },
         }
 
-    ranked = sorted(by_concept, key=by_concept.__getitem__, reverse=True)
-    pro = [c for c in ranked if by_concept[c] > 0][:top_for]
-    con = [c for c in reversed(ranked) if by_concept[c] < 0][:top_against]
+    ranked = sorted(shown, key=shown.__getitem__, reverse=True)
+    pro = [c for c in ranked if shown[c] > 0][:top_for]
+    con = [c for c in reversed(ranked) if shown[c] < 0][:top_against]
+    hidden = sum(v for c, v in by_concept.items() if c not in shown)
     return {
         "pick": "home" if pick_home else "away",
         "units": "log-odds toward the picked team",
-        "base": round(sign * float(contrib_row["bias"]), 4),
+        "base": round(sign * (float(contrib_row["bias"]) - home_field) + hidden, 4),
         "for": [driver(c) for c in pro],
         "against": [driver(c) for c in con],
     }
@@ -100,7 +129,14 @@ def shap_json(
 
 def explain(bundle: ModelBundle, df: pd.DataFrame, win_prob: np.ndarray) -> list[dict[str, Any]]:
     contrib = contributions(bundle, df)
+    anchor = bundle.anchors["win"]
+    intercept = float(anchor[0]) if anchor is not None else 0.0
     return [
-        shap_json(contrib.loc[idx], df.loc[idx], bool(p >= 0.5))
+        shap_json(
+            contrib.loc[idx],
+            df.loc[idx],
+            bool(p >= 0.5),
+            home_field=0.0 if df.loc[idx, "neutral"] == 1 else intercept,
+        )
         for idx, p in zip(df.index, win_prob, strict=True)
     ]

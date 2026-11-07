@@ -50,6 +50,11 @@ K_QB = 200.0
 QB_PRIOR_EPA = -0.05  # unknown/backup QB: below league average per dropback
 
 INJURY_STATUS_WEIGHT = {"Out": 1.0, "Doubtful": 0.75}
+# nflverse stopped publishing `date_modified` (missing from 2025 on). A game status of
+# Out/Doubtful comes from the final pre-game report, released the day before the game,
+# so undated rows are treated as published this long before kickoff. Dated rows keep
+# their real timestamp, and rows dated after kickoff are still ignored.
+UNDATED_REPORT_LEAD = timedelta(hours=24)
 # QB is 0 here because a QB change is measured directly by qb_delta.
 POSITION_WEIGHT = {
     "T": 1.0, "OT": 1.0, "LT": 1.0, "RT": 1.0,
@@ -189,22 +194,25 @@ def _injury_index(injuries: pd.DataFrame) -> dict[tuple[int, int, str], list[tup
     if injuries.empty:
         return idx
     inj = injuries[injuries["report_status"].isin(INJURY_STATUS_WEIGHT)]
+    dated = "date_modified" in inj.columns
     for r in inj.itertuples(index=False):
-        when = pd.Timestamp(r.date_modified)
-        if pd.isna(when):
-            continue
-        when = when.tz_localize(UTC) if when.tzinfo is None else when.tz_convert(UTC)
+        when: datetime | None = None
+        stamp = pd.Timestamp(r.date_modified) if dated else pd.NaT
+        if not pd.isna(stamp):
+            stamp = stamp.tz_localize(UTC) if stamp.tzinfo is None else stamp.tz_convert(UTC)
+            when = stamp.to_pydatetime()
         weight = INJURY_STATUS_WEIGHT[r.report_status] * POSITION_WEIGHT.get(
             str(r.position), DEFAULT_POSITION_WEIGHT
         )
-        idx[(int(r.season), int(r.week), r.team)].append((when.to_pydatetime(), r.gsis_id, weight))
+        idx[(int(r.season), int(r.week), r.team)].append((when, r.gsis_id, weight))
     return idx
 
 
 def _injury_load(entries: list[tuple], kickoff: datetime) -> tuple[float, datetime | None]:
     """Weighted players out, from the latest report row per player before kickoff."""
     latest: dict[str, tuple[datetime, float]] = {}
-    for when, pid, weight in entries:
+    for stamp, pid, weight in entries:
+        when = stamp if stamp is not None else kickoff - UNDATED_REPORT_LEAD
         if when < kickoff and (pid not in latest or when > latest[pid][0]):
             latest[pid] = (when, weight)
     if not latest:

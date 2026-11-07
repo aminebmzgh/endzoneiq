@@ -108,7 +108,26 @@ def test_shap_json_is_signed_toward_the_pick(bundle, features):
         assert all(d["impact"] < 0 for d in s["against"])
         assert len(s["for"]) <= 3 and len(s["against"]) <= 2
         for d in s["for"] + s["against"]:
-            assert d["concept"] in CONCEPTS and d["label"]
+            assert (d["concept"] in CONCEPTS or d["concept"] == "home_field") and d["label"]
+
+
+def test_neutral_factors_are_never_shown_as_reasons(bundle, features):
+    test = features[features["season"] == 2015]
+    prob = bundle.predict(test)["win_prob"].to_numpy()
+    shown = 0
+    for (_, row), s in zip(test.iterrows(), explain(bundle, test, prob), strict=True):
+        for d in s["for"] + s["against"]:
+            if d["concept"] == "qb_change":
+                assert row["qb_delta_diff"] != 0
+            if d["concept"] == "injuries":
+                assert row["injury_diff"] != 0
+            if d["concept"] == "rivalry":
+                assert row["div_game"] == 1
+            if d["concept"] == "home_field":
+                shown += 1
+                assert row["neutral"] == 0
+                assert (d in s["for"]) == (s["pick"] == "home")
+    assert shown > 0  # home field is surfaced as a driver
 
 
 def test_every_win_feature_has_a_concept():

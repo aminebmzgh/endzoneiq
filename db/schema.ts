@@ -276,8 +276,10 @@ export const picks = mysqlTable(
     winnerTeamId: smallint("winner_team_id")
       .notNull()
       .references(() => teams.id),
+    /** Probability that winner_team_id wins (always >= 0.5), rounded to 4 decimals. */
     winProb: double("win_prob").notNull(),
     confidenceTier: mysqlEnum("confidence_tier", confidenceTiers).notNull(),
+    /** Projected HOME margin in points (positive = home team wins by that much). */
     predSpread: double("pred_spread").notNull(),
     predTotal: double("pred_total").notNull(),
     featuresJson: jsonText<Record<string, unknown>>("features_json").notNull(),
@@ -295,6 +297,7 @@ export const picks = mysqlTable(
 );
 
 export const locales = ["en", "fr", "es"] as const;
+export const explanationSources = ["claude", "template"] as const;
 
 export const explanations = mysqlTable(
   "explanations",
@@ -307,6 +310,8 @@ export const explanations = mysqlTable(
     reasonsJson: jsonText<string[]>("reasons_json").notNull(),
     matchupNotesJson: jsonText<string[]>("matchup_notes_json").notNull(),
     generatedAt: utcDatetime("generated_at").notNull(),
+    /** "claude" when written by the model, "template" for the SHAP-template fallback. */
+    source: mysqlEnum("source", explanationSources).notNull().default("template"),
   },
   (t) => [primaryKey({ columns: [t.pickId, t.locale] })],
 );

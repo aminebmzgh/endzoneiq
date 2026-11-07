@@ -1,0 +1,1 @@
+ALTER TABLE `explanations` ADD `source` enum('claude','template') DEFAULT 'template' NOT NULL;

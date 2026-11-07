@@ -90,3 +90,14 @@ def test_backup_qb_start_is_flagged(features):
     assert (wk5["qb_delta_diff"] != 0).all()
     others = features[(features["week"] != 5)]
     assert (others["qb_delta_diff"] == 0).all()
+
+
+def test_undated_injury_reports_count_as_pre_game(inputs):
+    # nflverse dropped `date_modified` from 2025 on. Undated Out/Doubtful rows are the
+    # final pre-game report, dated 24h before kickoff: both teams' players now count.
+    sched, team, qb, inj = inputs
+    undated = inj.drop(columns=["date_modified"])
+    feats = build_features(sched, team, qb, undated)
+    assert (feats["injury_diff"] == 0.0).all()  # CB out (1.0) vs T out (1.0)
+    asof = pd.to_datetime(feats["data_asof"], utc=True)
+    assert (asof < pd.to_datetime(feats["kickoff"], utc=True)).all()

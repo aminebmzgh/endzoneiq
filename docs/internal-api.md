@@ -81,6 +81,33 @@ themselves live in a GitHub Release, never in MySQL).
 - Activation leaves exactly one active version.
 - Response: `{ id, name, created, activated }`.
 
+### `POST /api/internal/ingest/picks`
+
+`{ modelVersion, picks: [{ gameId, homeWinProb, tier, predMargin, predTotal, features, shap, changeReason?, explanations: { en, fr, es } }] }`.
+At most 64 picks per request. Each explanation is `{ headline, reasons[3], matchupNotes[1-3], source: "claude" | "template" }`.
+Each reason has at most 20 words; the zod schema enforces this again after the pipeline's pydantic checks.
+
+The site decides, per game:
+
+| Result         | When                                                                                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `created`      | No pick yet (version 1), or the winner changed, or the win probability moved by 5 points or more. The previous version is marked superseded and a new row is appended. |
+| `unchanged`    | Smaller moves. Sending the same payload twice is a no-op.                                                                                                              |
+| `locked`       | The game has kicked off (`kickoff_at <= now`). Its pick can never change.                                                                                              |
+| `unknown_game` | The game id isn't in `games`.                                                                                                                                          |
+
+The response is `{ created, unchanged, locked, unknownGames, chainHead, results }`.
+
+**Hash chain.** `content_hash` = SHA-256 of a canonical JSON of the pick plus `"|"` plus
+the previous pick's hash, across all games.
+
+- Canonical JSON means keys sorted recursively and no whitespace.
+- The hashed fields are `game_id`, `model_version`, `version_no`, `published_at`,
+  `winner`, `win_prob`, `confidence_tier`, `pred_spread`, `pred_total`, `features`,
+  `shap` and `change_reason`.
+
+The code is in `lib/picks/hash.ts`. `verifyChain()` re-checks the whole history.
+
 ## Coming in later phases
 
 `ingest/players-injuries`, `ingest/weather`, `ingest/odds` (Phase 7), `ingest/picks` and `ingest/results` (Phase 3), and `cron/*` with `CRON_SECRET`

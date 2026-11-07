@@ -17,7 +17,8 @@ in `BACKLOG.md`, never into the code.
 | 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions |
 | 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
 | 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)        |
-| 3–8               | Not started                                                                   |
+| 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations     |
+| 4–8               | Not started                                                                   |
 
 ## Stack
 
@@ -40,15 +41,18 @@ components/          UI components
 i18n/                next-intl routing, request config, navigation helpers
 messages/            en.json, fr.json, es.json (keys must match; tested)
 lib/                 server code: env.ts (zod, server-only), db/, health.ts, cache-tags.ts,
-                     internal/ (HMAC, rate limit, internalRoute wrapper, handlers), games/
-db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams, stadiums),
+                     internal/ (HMAC, rate limit, internalRoute wrapper, handlers), games/,
+                     picks/ (append-only repository, hash chain)
+db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams.json, stadiums.json),
                      migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
 scripts/             packaging, Hostinger deploy, smoke test, secret scan, local migrate
 pipeline/            Python package endzoneiq_pipeline (site_client, games, sources/, jobs/,
-                     model/: data, elo, features, train, backtest, explain) + tests
+                     model/: data, elo, features, train, backtest, explain;
+                     narrative*.py: explanations) + tests
 docs/                deployment.md, internal-api.md, model-card.md, backtest.md (generated)
-.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml
+.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml,
+                     publish_week.yml
 proxy.ts             next-intl locale detection/redirect (Next 16 renamed middleware → proxy)
 ```
 
@@ -75,13 +79,15 @@ cd pipeline && uv run python -m endzoneiq_pipeline.jobs.refresh_games --from-sea
 # Model (first run downloads ~16 seasons of play-by-play, ~8 min; aggregates cached in pipeline/.cache)
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.backtest --out ../docs/backtest.md
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.train_model --out model-out
+cd pipeline && uv run python -m endzoneiq_pipeline.jobs.publish_week --season 2026 --week 8   --dry-run --model-dir model-out --out picks.json     # past week, nothing published
 ```
 
 Polars (via nflreadpy) needs AVX2, which this dev machine lacks. Locally run pipeline jobs that
 load nflverse data with `uv run --with polars-runtime-compat ...`. CI runners don't need it.
 
 `npm test` includes DB integration tests that skip themselves when no database is reachable.
-CI runs them against a MariaDB service container.
+Locally they use `TEST_DATABASE_URL` (`endzoneiq_test`, created by `docker/initdb`), never the
+dev DB, because the picks tests reset append-only tables. CI uses a throwaway MariaDB container.
 
 ## Conventions
 
@@ -204,3 +210,27 @@ re-uploads a previous run's artifact.
   registers; its weekly schedule retrains only in the offseason.
 - **2026-11-07 Stadium data single source:** `db/seed/stadiums.json`, read by the TS seed
   and by the pipeline (`model/geo.py`) for travel and time-zone features.
+- **2026-11-07 Picks:** `win_prob` is the picked team's probability (≥ 0.5) and
+  `pred_spread` is the projected _home_ margin. A new version is appended only when the
+  winner changes or the probability moves ≥ 5 points; kicked-off games are locked. The global
+  hash chain covers the pick rows (not the explanation text); details in docs/internal-api.md.
+- **2026-11-07 Explanations:** Claude via `messages.parse` with a pydantic `output_format`,
+  model from `CLAUDE_MODEL_FAST` (no hardcoded model), effort `low`. EN first, then FR/ES
+  written natively with EN as reference. Each locale is validated:
+  - exactly 3 reasons of at most 20 words;
+  - no betting or guarantee words (EN/FR/ES);
+  - every number must appear in the facts.
+
+  An answer that fails gets one retry, then the SHAP template for that locale. Without
+  `ANTHROPIC_API_KEY` + `CLAUDE_MODEL_FAST` everything uses templates.
+
+- **2026-11-07 SHAP drivers never include factors at their neutral value** (no QB change,
+  equal injuries, ...), and home-field advantage (the anchor's intercept) is its own driver.
+- **2026-11-07 Injury timestamps:** nflverse injury rows have no `date_modified` from 2025
+  on. Undated Out/Doubtful statuses are treated as published 24 h before kickoff. Before this
+  fix the injury feature was silently zero for 2025–2026 (model-card run 5).
+- **2026-11-07 Publishing is gated:** `publish_week.yml` publishes on schedule only when the
+  repo variable `PUBLISH_ENABLED=true` (picks are permanent); otherwise it's a dry run with a
+  `picks.json` artifact.
+- **2026-11-07 Tests run file by file** (`fileParallelism: false`) because the integration
+  tests share one test database.

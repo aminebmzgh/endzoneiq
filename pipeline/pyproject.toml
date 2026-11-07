@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 # Heavier deps (nflreadpy, pandas, scikit-learn, lightgbm, shap, anthropic) are
 # added in the phase that first uses them, to keep CI fast until then.
 dependencies = [
+  "anthropic>=2.6.0",
   "httpx>=0.28",
   "lightgbm>=4.7.0",
   "nflreadpy>=0.1.5",
@@ -44,3 +45,6 @@ addopts = "-q"
 [tool.ruff.lint.per-file-ignores]
 # En dashes are intentional in the generated Markdown report.
 "endzoneiq_pipeline/model/backtest.py" = ["RUF001"]
+# User-facing EN/FR/ES sentences read better unwrapped.
+"endzoneiq_pipeline/narrative.py" = ["E501", "RUF001"]
+"tests/test_narrative.py" = ["E501"]

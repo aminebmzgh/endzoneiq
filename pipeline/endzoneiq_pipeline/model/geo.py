@@ -6,29 +6,17 @@ its `stadiums` table from, so the two can never disagree.
 
 from __future__ import annotations
 
-import json
 import math
-import os
 from datetime import datetime
-from functools import cache
-from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from endzoneiq_pipeline import reference
 
 EARTH_RADIUS_KM = 6371.0
 
 
-def stadiums_path() -> Path:
-    override = os.environ.get("STADIUMS_JSON")
-    if override:
-        return Path(override)
-    # pipeline/endzoneiq_pipeline/model/geo.py -> repo root
-    return Path(__file__).resolve().parents[3] / "db" / "seed" / "stadiums.json"
-
-
-@cache
 def stadiums() -> dict[str, dict]:
-    with open(stadiums_path(), encoding="utf-8") as f:
-        return {s["id"]: s for s in json.load(f)}
+    return reference.stadiums()
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

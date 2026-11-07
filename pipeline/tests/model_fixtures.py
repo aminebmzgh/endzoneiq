@@ -100,6 +100,7 @@ def synthetic(seasons=(2011, 2012, 2013, 2014), weeks: int = 8, seed: int = 1):
                         "week": week,
                         "gsis_id": f"P-{home}-1",
                         "position": "CB",
+                        "full_name": f"Corner {home}",
                         "report_status": "Out",
                         "date_modified": kickoff_day - pd.Timedelta(days=2),
                     }
@@ -113,6 +114,7 @@ def synthetic(seasons=(2011, 2012, 2013, 2014), weeks: int = 8, seed: int = 1):
                         "week": week,
                         "gsis_id": f"P-{away}-9",
                         "position": "T",
+                        "full_name": f"Tackle {away}",
                         "report_status": "Out",
                         "date_modified": kickoff_day + pd.Timedelta(days=1),
                     }
