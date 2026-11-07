@@ -22,12 +22,10 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   return {
     metadataBase: new URL(siteUrl),
-    title: t("title"),
+    title: { default: t("title"), template: "%s | EndzoneIQ" },
     description: t("description"),
-    alternates: {
-      canonical: `/${locale}`,
-      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}`])),
-    },
+    applicationName: "EndzoneIQ",
+    openGraph: { siteName: "EndzoneIQ", type: "website" },
   };
 }
 

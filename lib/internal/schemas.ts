@@ -111,3 +111,36 @@ export const ingestPicksBody = z.object({
   modelVersion: modelVersionBody.shape.name,
   picks: z.array(pickInput).min(1).max(MAX_PICKS_PER_REQUEST),
 });
+
+// --- Results and team stats (Phase 4) ------------------------------------------
+
+const season = z.number().int().min(1990).max(2100);
+
+/** POST /api/internal/ingest/results: grade final games (all seasons, or the listed ones). */
+export const ingestResultsBody = z.object({
+  seasons: z.array(season).max(50).optional(),
+});
+
+const epa = z.number().min(-2).max(2).nullable();
+const rank = z.number().int().min(1).max(32).nullable();
+
+export const teamStatInput = z.object({
+  abbr,
+  elo: z.number().min(800).max(2200),
+  offEpa: epa,
+  defEpa: epa,
+  offPassEpa: epa,
+  offRunEpa: epa,
+  defPassEpa: epa,
+  defRunEpa: epa,
+  offEpaRank: rank,
+  defEpaRank: rank,
+});
+export type TeamStatInput = z.infer<typeof teamStatInput>;
+
+/** POST /api/internal/ingest/team-stats: one snapshot per team after a completed week. */
+export const ingestTeamStatsBody = z.object({
+  season,
+  week: z.number().int().min(0).max(25),
+  teams: z.array(teamStatInput).min(1).max(32),
+});

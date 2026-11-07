@@ -11,6 +11,7 @@ import {
   players,
   seasons,
   teams,
+  teamWeekStats,
 } from "@/db/schema";
 import { tags } from "@/lib/cache-tags";
 import { getDb } from "@/lib/db";
@@ -18,8 +19,16 @@ import { serverEnv } from "@/lib/env";
 import { gamesDigest } from "@/lib/games/digest";
 import { seasonDigestRows, upsertGames, upsertSeasons } from "@/lib/games/repository";
 import { InternalApiError, internalRoute } from "./route";
+import { gradeFinishedGames, type GradeResult } from "@/lib/picks/grading";
 import { publishPicks } from "@/lib/picks/repository";
-import { ingestGamesBody, ingestPicksBody, modelVersionBody, pipelineRunBody } from "./schemas";
+import {
+  ingestGamesBody,
+  ingestPicksBody,
+  ingestResultsBody,
+  ingestTeamStatsBody,
+  modelVersionBody,
+  pipelineRunBody,
+} from "./schemas";
 
 /**
  * Handlers for /api/internal/*. Route files under app/api/internal only
@@ -40,9 +49,16 @@ export const ingestGames = internalRoute(
     }
     if (seasonsChanged > 0) revalidateTag(tags.seasons, "max");
 
+    // New final scores: grade those games right away (idempotent).
+    const graded =
+      result.changedSeasons.length > 0
+        ? await gradeFinishedGames({ seasons: result.changedSeasons })
+        : { graded: 0, gameIds: [], seasons: [] };
+    revalidateGraded(graded);
+
     return {
-      rows: result.inserted + result.updated + seasonsChanged,
-      data: { ...result, received: body.games.length, seasonsChanged },
+      rows: result.inserted + result.updated + seasonsChanged + graded.graded,
+      data: { ...result, received: body.games.length, seasonsChanged, graded: graded.graded },
     };
   },
 );
@@ -213,5 +229,80 @@ export const ingestPicks = internalRoute(
         results,
       },
     };
+  },
+);
+
+function revalidateGraded(graded: GradeResult) {
+  if (graded.graded === 0) return;
+  revalidateTag(tags.results, "max");
+  for (const id of graded.gameIds) revalidateTag(tags.game(id), "max");
+}
+
+/**
+ * POST /api/internal/ingest/results: grade every final game whose pick has no
+ * result yet (optionally only some seasons). Grading happens on the site from the
+ * stored scores, so it also runs after every games ingest; this endpoint lets the
+ * grade_picks job trigger and report it explicitly. Idempotent.
+ */
+export const ingestResults = internalRoute(
+  { endpoint: "ingest/results", schema: ingestResultsBody },
+  async ({ body }) => {
+    const graded = await gradeFinishedGames({ seasons: body.seasons });
+    revalidateGraded(graded);
+    return { rows: graded.graded, data: graded };
+  },
+);
+
+/**
+ * POST /api/internal/ingest/team-stats: Elo and season-to-date efficiency per team
+ * (team pages). Upsert keyed on (team, season, week); unchanged rows are not touched.
+ */
+export const ingestTeamStats = internalRoute(
+  { endpoint: "ingest/team-stats", schema: ingestTeamStatsBody },
+  async ({ body }) => {
+    const db = getDb();
+    const ids = new Map(
+      (await db.select({ id: teams.id, abbr: teams.abbr }).from(teams)).map((t) => [t.abbr, t.id]),
+    );
+    const unknown = body.teams.filter((t) => !ids.has(t.abbr)).map((t) => t.abbr);
+    if (unknown.length > 0) {
+      throw new InternalApiError(422, `unknown teams: ${unknown.join(", ")}`);
+    }
+    const values = body.teams.map(({ abbr, ...stats }) => ({
+      teamId: ids.get(abbr)!,
+      season: body.season,
+      week: body.week,
+      ...stats,
+    }));
+    // Compare with what is stored and write only new or changed rows.
+    const stored = await db
+      .select()
+      .from(teamWeekStats)
+      .where(and(eq(teamWeekStats.season, body.season), eq(teamWeekStats.week, body.week)));
+    const fields = [
+      "elo",
+      "offEpa",
+      "defEpa",
+      "offPassEpa",
+      "offRunEpa",
+      "defPassEpa",
+      "defRunEpa",
+      "offEpaRank",
+      "defEpaRank",
+    ] as const;
+    const byTeam = new Map(stored.map((r) => [r.teamId, r]));
+    const changed = values.filter((v) => {
+      const old = byTeam.get(v.teamId);
+      return !old || fields.some((k) => (old[k] ?? null) !== (v[k] ?? null));
+    });
+    if (changed.length > 0) {
+      const col = (c: (typeof fields)[number]) => sql`VALUES(${teamWeekStats[c]})`;
+      await db
+        .insert(teamWeekStats)
+        .values(changed)
+        .onDuplicateKeyUpdate({ set: Object.fromEntries(fields.map((k) => [k, col(k)])) });
+      revalidateTag(tags.teams, "max");
+    }
+    return { rows: changed.length, data: { received: values.length, changed: changed.length } };
   },
 );

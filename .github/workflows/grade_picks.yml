@@ -1,0 +1,49 @@
+# Grade picks (spec 12.1): store the latest final scores, grade finished games on the
+# site, and refresh the team pages' ratings (Elo + season-to-date EPA ranks).
+#
+# Grading is computed by the site from the scores it stores, and it also runs after
+# every games ingest (daily refresh_data). This workflow makes it happen right after
+# Thursday, Sunday and Monday games.
+name: Grade picks
+
+on:
+  schedule:
+    # 02:00 US Eastern Mon/Tue/Fri = 07:00 UTC in winter (EST), 03:00 Eastern in summer.
+    - cron: "0 7 * * 1,2,5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grade-picks
+  cancel-in-progress: false
+
+jobs:
+  grade:
+    name: Scores, grading, team ratings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.cache/nflverse
+          key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
+          restore-keys: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-
+      - run: uv sync --locked --no-dev
+      - name: Ingest the latest scores (grades on the site)
+        run: uv run --no-dev python -m endzoneiq_pipeline.jobs.refresh_games
+      - name: Grade and post team ratings
+        run: uv run --no-dev python -m endzoneiq_pipeline.jobs.grade_picks

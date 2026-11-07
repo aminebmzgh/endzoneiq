@@ -18,7 +18,8 @@ in `BACKLOG.md`, never into the code.
 | 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
 | 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)        |
 | 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations     |
-| 4–8               | Not started                                                                   |
+| 4 Public web app  | ✅ Done 2026-11-07. Home/week/game/record/team pages, grading, SEO, caching   |
+| 5–8               | Not started                                                                   |
 
 ## Stack
 
@@ -35,14 +36,19 @@ in `BACKLOG.md`, never into the code.
 ## Layout
 
 ```
-app/[locale]/        localized pages (root layout lives here; html lang = locale)
+app/[locale]/        localized pages (root layout lives here; html lang = locale):
+                     game/[slug], weeks/[season]/[week], teams, teams/[abbr], and
+                     ez-view/[view] (internal: home + record, reached via proxy.ts rewrite)
+app/sitemap.ts, app/robots.ts, app/[locale]/**/opengraph-image.tsx   SEO
 app/api/             route handlers (/api/health; /api/internal/* re-export lib/internal/handlers)
-components/          UI components
+components/          UI components (picks/: game card, badges, week view; views/: home,
+                     record; record/: filter table; local-time, after-kickoff)
 i18n/                next-intl routing, request config, navigation helpers
 messages/            en.json, fr.json, es.json (keys must match; tested)
 lib/                 server code: env.ts (zod, server-only), db/, health.ts, cache-tags.ts,
                      internal/ (HMAC, rate limit, internalRoute wrapper, handlers), games/,
-                     picks/ (append-only repository, hash chain)
+                     picks/ (append-only repository, hash chain, grading),
+                     site/ (cached public reads `data.ts`, record stats, labels, SEO)
 db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams.json, stadiums.json),
                      migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
@@ -51,7 +57,7 @@ pipeline/            Python package endzoneiq_pipeline (site_client, games, sour
                      model/: data, elo, features, train, backtest, explain;
                      narrative*.py: explanations) + tests
 docs/                deployment.md, internal-api.md, model-card.md, backtest.md (generated)
-.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml,
+.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml, grade_picks.yml,
                      publish_week.yml
 proxy.ts             next-intl locale detection/redirect (Next 16 renamed middleware → proxy)
 ```
@@ -80,7 +86,14 @@ cd pipeline && uv run python -m endzoneiq_pipeline.jobs.refresh_games --from-sea
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.backtest --out ../docs/backtest.md
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.train_model --out model-out
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.publish_week --season 2026 --week 8   --dry-run --model-dir model-out --out picks.json     # past week, nothing published
+cd pipeline && uv run python -m endzoneiq_pipeline.jobs.grade_picks --dry-run   # team snapshot only
+
+# Load test (spec Phase 4: ~50 concurrent users); exits 1 on errors or p95 > 2 s
+node scripts/load-test.mjs https://endzoneiq.com 50 30
 ```
+
+Test a production build locally: `npm run build && npx next start -p 3100` (needs the local
+DB for data pages). Pages are cached after their first visit, so check `x-nextjs-cache: HIT`.
 
 Polars (via nflreadpy) needs AVX2, which this dev machine lacks. Locally run pipeline jobs that
 load nflverse data with `uv run --with polars-runtime-compat ...`. CI runners don't need it.
@@ -234,3 +247,27 @@ re-uploads a previous run's artifact.
   `picks.json` artifact.
 - **2026-11-07 Tests run file by file** (`fileParallelism: false`) because the integration
   tests share one test database.
+- **2026-11-07 Public pages are static entries filled on first visit.** The build can't
+  reach MySQL, so no page with data may be prerendered:
+  - Data reads are `use cache` functions in `lib/site/data.ts`, tagged with
+    `lib/cache-tags.ts` and `cacheLife("hours")`. Ingests revalidate the tags.
+  - Data routes export `ensureStatic = "navigation"` and a placeholder
+    `generateStaticParams` (`"_"`, which 404s before any data access). Real params render on
+    the first visit, then are served as `x-nextjs-cache: HIT`.
+  - Home and record have no dynamic param (and the locale must be listed at build), so
+    `proxy.ts` rewrites `/[locale]` and `/[locale]/record` to `/[locale]/ez-view/[view]`.
+    Direct visits to `ez-view` get a 404.
+  - Never use `connection()`, `Date.now()` or other request-time APIs in pages (except
+    `sitemap.ts`). Clock-dependent UI ("Locked at kickoff") is client-side via
+    `components/after-kickoff.tsx`; kickoff times render in the visitor's time zone via
+    `components/local-time.tsx` (Eastern on the server).
+  - Measured locally (warm): 146 req/s at 50 users, p95 473 ms; before (per-request
+    rendering) 18 req/s, p95 6 s.
+- **2026-11-07 Grading happens on the site** from stored scores, after every games ingest
+  and via `ingest/results` (`grade_picks.yml`, Mon/Tue/Fri 07:00 UTC). Ties are
+  `correct_winner = false` but shown as ties. ATS/totals are not tracked (no market
+  lines); the record page says so.
+- **2026-11-07 Team pages** show the model's own Elo and season-to-date EPA ranks, posted by
+  `grade_picks` to `ingest/team-stats` (computed by `model/team_stats.py`).
+- **2026-11-07 Team colors appear only as small swatches**; probability bars use the accent
+  color for the pick, so dark team colors stay readable in dark mode. No logos.

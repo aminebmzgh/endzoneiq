@@ -108,7 +108,41 @@ the previous pick's hash, across all games.
 
 The code is in `lib/picks/hash.ts`. `verifyChain()` re-checks the whole history.
 
+### `POST /api/internal/ingest/results`
+
+`{ seasons?: number[] }`. Grades every final game whose current pick has no result yet
+(all seasons, or only the listed ones). Response: `{ graded, gameIds, seasons }`. Idempotent.
+
+- Grading is done **on the site, from the stored scores**, so the track record can never
+  disagree with the scores the site shows. It also runs after every `ingest/games` call that
+  changes a season, so final scores are graded as soon as they arrive.
+- The pick graded is the one current at kickoff. Picks lock at kickoff, so that's the current
+  version. `correct_winner` is false for a tie; the record shows ties separately.
+- `covered_spread` and `total_result` stay `NULL`. They only mean something against a market
+  line, and EndzoneIQ doesn't use betting lines unless `FEATURE_ODDS` is enabled.
+
+### `POST /api/internal/ingest/team-stats`
+
+`{ season, week, teams: [{ abbr, elo, offEpa, defEpa, offPassEpa, offRunEpa, defPassEpa, defRunEpa, offEpaRank, defEpaRank }] }`
+(at most 32 teams). This is the team pages' snapshot after the last completed week: the
+model's Elo and season-to-date EPA per play, ranked 1–32 (1 = best offense or stingiest
+defense). Rows are compared with what is stored and only changes are written.
+Response: `{ received, changed }`.
+
+## Cache revalidation
+
+Public pages are static entries that live in the server's cache (see CLAUDE.md, decision
+"Public pages"). Each ingest revalidates the tags of what it changed (`lib/cache-tags.ts`):
+
+| Endpoint               | Tags                                                       |
+| ---------------------- | ---------------------------------------------------------- |
+| `ingest/games`         | `games`, `season-<year>`, `seasons`, plus the grading tags |
+| `ingest/picks`         | `picks`, `game-<id>`                                       |
+| `ingest/results`       | `results`, `game-<id>`                                     |
+| `ingest/team-stats`    | `teams`                                                    |
+| `ingest/model-version` | `model`                                                    |
+
 ## Coming in later phases
 
-`ingest/players-injuries`, `ingest/weather`, `ingest/odds` (Phase 7), `ingest/picks` and `ingest/results` (Phase 3), and `cron/*` with `CRON_SECRET`
+`ingest/players-injuries`, `ingest/weather`, `ingest/odds` and `cron/*` with `CRON_SECRET`
 (Phase 7). They reuse `internalRoute()` from `lib/internal/route.ts`.

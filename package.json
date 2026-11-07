@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "check:client-secrets": "node scripts/check-client-secrets.mjs",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate-local.ts",
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate-local.ts",
     "db:studio": "drizzle-kit studio",
     "build:migrator": "node scripts/build-migrator.mjs",
     "package": "bash scripts/package-standalone.sh",

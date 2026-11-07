@@ -12,6 +12,9 @@
   --border: #dde3ec;
   --accent: #0a7d55;
   --accent-foreground: #ffffff;
+  --card: #f8fafc;
+  --danger: #b42318;
+  --track: #e3e8ef;
   --radius: 0.625rem;
 }
 
@@ -24,6 +27,9 @@
   --border: #253043;
   --accent: #34d399;
   --accent-foreground: #04120c;
+  --card: #111724;
+  --danger: #f97066;
+  --track: #253043;
 }
 
 @theme inline {
@@ -34,6 +40,9 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-card: var(--card);
+  --color-danger: var(--danger);
+  --color-track: var(--track);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --font-sans: var(--font-geist-sans);
