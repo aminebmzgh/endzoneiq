@@ -7,7 +7,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { runMigrations } from "@/db/migrator";
 import { resetServerEnvForTests } from "@/lib/env";
 import { gamesDigest } from "@/lib/games/digest";
-import { exportState, gamesDigestHandler, ingestGames, pipelineRun } from "@/lib/internal/handlers";
+import {
+  exportState,
+  gamesDigestHandler,
+  ingestGames,
+  ingestModelVersion,
+  pipelineRun,
+} from "@/lib/internal/handlers";
 import { sign } from "@/lib/internal/signature";
 import { connect, dbReachable, testDbUrl } from "./helpers/db";
 
@@ -65,6 +71,7 @@ async function cleanup() {
   await c.query("DELETE FROM games WHERE season = ?", [TEST_SEASON]);
   await c.query("DELETE FROM seasons WHERE year = ?", [TEST_SEASON]);
   await c.query("DELETE FROM pipeline_runs WHERE id LIKE 'vitest-%'");
+  await c.query("DELETE FROM model_versions WHERE name LIKE 'vitest-%'");
   await c.end();
 }
 
@@ -314,5 +321,59 @@ describe("pipeline-run and export (integration)", () => {
     expect(body.featureFlags).toEqual({ odds: false });
     expect(body.seasons).toContainEqual({ year: TEST_SEASON, currentWeek: 1, phase: "regular" });
     expect(Array.isArray(body.currentPicks)).toBe(true);
+  });
+});
+
+describe("POST /api/internal/ingest/model-version (integration)", () => {
+  const p = "/api/internal/ingest/model-version";
+  const send = (body: unknown) => ingestModelVersion(signed("POST", p, JSON.stringify(body)));
+  const version = (name: string, activate = true) => ({
+    name,
+    trainedAt: "2026-11-07T12:00:00Z",
+    metrics: { train_games: 3951, sigma_margin: 12.7 },
+    artifactUrl: `https://github.com/aminebmzgh/endzoneiq/releases/tag/model-${name}`,
+    activate,
+  });
+
+  it("rejects unsigned and invalid requests", async (ctx) => {
+    if (!reachable) ctx.skip();
+    const unsigned = await ingestModelVersion(
+      new Request(`http://localhost${p}`, { method: "POST", body: "{}" }),
+    );
+    expect(unsigned.status).toBe(401);
+    expect((await send({ ...version("vitest-a"), name: "Has Spaces" })).status).toBe(422);
+  });
+
+  it("registers idempotently and keeps exactly one active version", async (ctx) => {
+    if (!reachable) ctx.skip();
+    const a = "vitest-model-a";
+    const b = "vitest-model-b";
+
+    const first = await send(version(a));
+    expect(await first.json()).toMatchObject({ name: a, created: true, activated: true });
+    const again = await send(version(a));
+    expect(await again.json()).toMatchObject({ name: a, created: false, activated: false });
+
+    expect(await (await send(version(b))).json()).toMatchObject({ created: true, activated: true });
+    // Registering without activation leaves the active version alone.
+    expect(await (await send(version("vitest-model-c", false))).json()).toMatchObject({
+      created: true,
+      activated: false,
+    });
+
+    const c = await connect();
+    const [rows] = await c.query("SELECT name FROM model_versions WHERE is_active = 1");
+    const [[stored]] = (await c.query(
+      "SELECT metrics_json, artifact_url FROM model_versions WHERE name = ?",
+      [a],
+    )) as unknown as [Array<{ metrics_json: unknown; artifact_url: string }>];
+    await c.end();
+    expect(rows).toEqual([{ name: b }]);
+    const metrics =
+      typeof stored!.metrics_json === "string"
+        ? JSON.parse(stored!.metrics_json)
+        : stored!.metrics_json; // mysql2 may already parse JSON columns
+    expect(metrics).toEqual({ train_games: 3951, sigma_margin: 12.7 });
+    expect(stored!.artifact_url).toContain("releases/tag/model-vitest-model-a");
   });
 });

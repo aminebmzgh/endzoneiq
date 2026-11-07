@@ -16,7 +16,8 @@ in `BACKLOG.md`, never into the code.
 | ----------------- | ----------------------------------------------------------------------------- |
 | 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions |
 | 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
-| 2–8               | Not started                                                                   |
+| 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)        |
+| 3–8               | Not started                                                                   |
 
 ## Stack
 
@@ -44,9 +45,10 @@ db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams, stadiums
                      migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
 scripts/             packaging, Hostinger deploy, smoke test, secret scan, local migrate
-pipeline/            Python package endzoneiq_pipeline (site_client, games, sources/, jobs/) + tests
-docs/                deployment.md, internal-api.md (more docs per phase)
-.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml
+pipeline/            Python package endzoneiq_pipeline (site_client, games, sources/, jobs/,
+                     model/: data, elo, features, train, backtest, explain) + tests
+docs/                deployment.md, internal-api.md, model-card.md, backtest.md (generated)
+.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml
 proxy.ts             next-intl locale detection/redirect (Next 16 renamed middleware → proxy)
 ```
 
@@ -69,6 +71,10 @@ cd pipeline && uv sync && uv run pytest && uv run ruff check . && uv run ruff fo
 
 # Ingest games into a running site (local: SITE_URL=http://localhost:3000 + INGEST_SECRET from .env.local)
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.refresh_games --from-season 2012
+
+# Model (first run downloads ~16 seasons of play-by-play, ~8 min; aggregates cached in pipeline/.cache)
+cd pipeline && uv run python -m endzoneiq_pipeline.jobs.backtest --out ../docs/backtest.md
+cd pipeline && uv run python -m endzoneiq_pipeline.jobs.train_model --out model-out
 ```
 
 Polars (via nflreadpy) needs AVX2, which this dev machine lacks. Locally run pipeline jobs that
@@ -180,3 +186,21 @@ re-uploads a previous run's artifact.
 - **2026-11-07 GET route handlers call `await connection()`** before reading the request, so
   `cacheComponents` never prerenders them. Handlers live in `lib/internal/handlers.ts` so
   tests can call them directly.
+- **2026-11-07 Model v1 = Elo-anchored LightGBM.** A linear Elo anchor (refit per training
+  set) is LightGBM's `init_score` for win and margin; the trees learn corrections. Rounds,
+  Platt calibration and σ come from an inner 3-season walk-forward. The design changed 4
+  times while looking at the same backtest seasons; all runs are listed in
+  docs/model-card.md. The edge over Elo is small (95% CI just includes zero): say so,
+  never overclaim.
+- **2026-11-07 No look-ahead by construction:** results count as data 4 h after kickoff,
+  injury rows stamped after kickoff are ignored, every feature row has `data_asof`, and the
+  jobs refuse to run if any `data_asof >= kickoff`. Leakage tests mutate future data.
+- **2026-11-07 Win/margin models never see symmetric "scoring environment" features**
+  (totals only), so SHAP reasons for a pick are always about the matchup.
+- **2026-11-07 SHAP via LightGBM `pred_contrib`** (exact TreeSHAP), plus the anchor's linear
+  terms. No `shap`/numba dependency.
+- **2026-11-07 Model files live in GitHub Releases** (`model-<name>`), names are
+  content hashes (same data → same name → no new version). `retrain.yml` publishes and
+  registers; its weekly schedule retrains only in the offseason.
+- **2026-11-07 Stadium data single source:** `db/seed/stadiums.json`, read by the TS seed
+  and by the pipeline (`model/geo.py`) for travel and time-zone features.

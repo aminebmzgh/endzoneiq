@@ -53,3 +53,14 @@ export const pipelineRunBody = z.object({
   error: z.string().max(10_000).optional(),
   runUrl: z.url().max(255).optional(),
 });
+
+export const modelVersionBody = z.object({
+  /** Content-addressed name from the pipeline, e.g. "lgbm-v1-a2b1f4972c". */
+  name: z.string().regex(/^[a-z0-9][a-z0-9.-]{2,63}$/, "lowercase name, e.g. lgbm-v1-abc123"),
+  trainedAt: z.iso.datetime({ offset: false }),
+  metrics: z.record(z.string(), z.unknown()),
+  /** Where the model files live (a GitHub Release). Never stored in MySQL. */
+  artifactUrl: z.url().max(512).nullable().optional(),
+  /** Make this the version used for new picks (exactly one version is active). */
+  activate: z.boolean().default(false),
+});

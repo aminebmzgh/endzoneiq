@@ -7,8 +7,13 @@ requires-python = ">=3.12,<3.13"
 # added in the phase that first uses them, to keep CI fast until then.
 dependencies = [
   "httpx>=0.28",
+  "lightgbm>=4.7.0",
   "nflreadpy>=0.1.5",
+  "numpy>=2.5.4",
+  "pandas>=3.1.1",
+  "pyarrow>=26.0.1",
   "pydantic>=2.10",
+  "scikit-learn>=1.9.1",
   "tzdata>=2026.6",
 ]
 
@@ -35,3 +40,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff.lint.per-file-ignores]
+# En dashes are intentional in the generated Markdown report.
+"endzoneiq_pipeline/model/backtest.py" = ["RUF001"]

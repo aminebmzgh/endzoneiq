@@ -22,7 +22,7 @@ Implementations: `lib/internal/signature.ts` (site) and
 `pipeline/endzoneiq_pipeline/site_client.py` (pipeline). Both test suites assert the same
 test vector, so the two stay compatible.
 
-## Endpoints (Phase 1)
+## Endpoints
 
 ### `POST /api/internal/ingest/games`
 
@@ -71,8 +71,17 @@ Upserted by `id` (`<github run id>-<attempt>-<job>`).
 `{ generatedAt, featureFlags: { odds }, seasons, injuryOverrides, currentPicks }`: the state
 the pipeline needs before predicting (overrides and picks only for games not yet kicked off).
 
+### `POST /api/internal/ingest/model-version`
+
+`{ name, trainedAt, metrics, artifactUrl?, activate? }`. Registers a trained model (the files
+themselves live in a GitHub Release, never in MySQL).
+
+- Names are content hashes (`lgbm-v1-<hash>`), so an existing name is never overwritten.
+  Sending it again only (re)activates it when `activate` is true.
+- Activation leaves exactly one active version.
+- Response: `{ id, name, created, activated }`.
+
 ## Coming in later phases
 
-`ingest/players-injuries`, `ingest/weather`, `ingest/odds` (Phase 7), `ingest/model-version`
-(Phase 2), `ingest/picks` and `ingest/results` (Phase 3), and `cron/*` with `CRON_SECRET`
+`ingest/players-injuries`, `ingest/weather`, `ingest/odds` (Phase 7), `ingest/picks` and `ingest/results` (Phase 3), and `cron/*` with `CRON_SECRET`
 (Phase 7). They reuse `internalRoute()` from `lib/internal/route.ts`.

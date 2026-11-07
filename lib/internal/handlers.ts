@@ -1,15 +1,24 @@
 import "server-only";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, ne, sql } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
-import { games, injuries, picks, pipelineRuns, players, seasons, teams } from "@/db/schema";
+import {
+  games,
+  injuries,
+  modelVersions,
+  picks,
+  pipelineRuns,
+  players,
+  seasons,
+  teams,
+} from "@/db/schema";
 import { tags } from "@/lib/cache-tags";
 import { getDb } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { gamesDigest } from "@/lib/games/digest";
 import { seasonDigestRows, upsertGames, upsertSeasons } from "@/lib/games/repository";
 import { InternalApiError, internalRoute } from "./route";
-import { ingestGamesBody, pipelineRunBody } from "./schemas";
+import { ingestGamesBody, modelVersionBody, pipelineRunBody } from "./schemas";
 
 /**
  * Handlers for /api/internal/*. Route files under app/api/internal only
@@ -121,3 +130,51 @@ export const exportState = internalRoute({ endpoint: "export" }, async () => {
     },
   };
 });
+
+/**
+ * POST /api/internal/ingest/model-version: register a trained model (idempotent).
+ * Names are content hashes, so an existing name is never overwritten: re-sending it
+ * only (re)activates it if asked. Activation leaves exactly one active version.
+ */
+export const ingestModelVersion = internalRoute(
+  { endpoint: "ingest/model-version", schema: modelVersionBody },
+  async ({ body }) => {
+    const db = getDb();
+    return db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: modelVersions.id, isActive: modelVersions.isActive })
+        .from(modelVersions)
+        .where(eq(modelVersions.name, body.name))
+        .for("update");
+      let id = existing?.id;
+      const created = !existing;
+      if (!existing) {
+        const [res] = await tx.insert(modelVersions).values({
+          name: body.name,
+          trainedAt: new Date(body.trainedAt),
+          metricsJson: body.metrics,
+          artifactUrl: body.artifactUrl ?? null,
+          isActive: false,
+        });
+        id = res.insertId;
+      }
+      let activated = false;
+      if (body.activate) {
+        const [others] = await tx
+          .update(modelVersions)
+          .set({ isActive: false })
+          .where(and(ne(modelVersions.name, body.name), eq(modelVersions.isActive, true)));
+        const [me] = await tx
+          .update(modelVersions)
+          .set({ isActive: true })
+          .where(and(eq(modelVersions.name, body.name), eq(modelVersions.isActive, false)));
+        activated = me.affectedRows > 0 || others.affectedRows > 0;
+      }
+      if (created || activated) revalidateTag(tags.model, "max");
+      return {
+        rows: Number(created) + Number(activated),
+        data: { id, name: body.name, created, activated },
+      };
+    });
+  },
+);

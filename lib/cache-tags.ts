@@ -6,4 +6,5 @@ export const tags = {
   games: "games",
   season: (year: number) => `season-${year}`,
   seasons: "seasons",
+  model: "model",
 } as const;
