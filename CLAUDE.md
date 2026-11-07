@@ -302,6 +302,15 @@ re-uploads a previous run's artifact.
   user gets a `profiles` row (database hook); `ADMIN_EMAILS` get the admin role. Auth is
   created lazily (`getAuth()`), so the build needs no secret; without one, `/api/auth`
   answers 503.
+- **2026-11-07 Sign-in is email + password** (user request: no email on every sign-in).
+  - A new account confirms its email once (`requireEmailVerification`), which prevents
+    someone from registering another person's address with their own password.
+  - Password reset sends an email link that lands on `/[locale]/reset-password`. It also
+    sets a first password on accounts created by magic link.
+  - The emailed one-time link stays available as a secondary option.
+  - Better Auth's rate limits (stricter on sign-in and reset) run in production only,
+    keyed on `x-forwarded-for`.
+  - Sessions last 30 days.
 - **2026-11-07 No auth or i18n code in the browser.** Pages stay cached HTML shared by
   everyone. Per-viewer parts are small client components that call `/api/me` and
   `/api/pro/game`; sign-in posts to Better Auth's endpoints with plain `fetch`.

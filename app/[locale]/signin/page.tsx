@@ -20,30 +20,51 @@ export async function generateMetadata({
   };
 }
 
+const LABELS = [
+  "intro",
+  "introSignUp",
+  "email",
+  "emailPlaceholder",
+  "password",
+  "passwordHint",
+  "signInButton",
+  "signingIn",
+  "createAccount",
+  "creating",
+  "noAccount",
+  "haveAccount",
+  "forgot",
+  "forgotIntro",
+  "sendReset",
+  "useLink",
+  "send",
+  "sending",
+  "backToSignIn",
+  "or",
+  "google",
+  "error",
+  "invalidCredentials",
+  "notVerified",
+  "exists",
+  "tooShort",
+  "tooMany",
+  "notConfigured",
+] as const;
+const TEMPLATES = ["resetSent", "signUpSent", "sent"] as const;
+
 /** Static page; the form talks to /api/auth in the browser. Returns to the account page. */
 export default async function SignInPage({ params }: PageProps<"/[locale]/signin">) {
   const { locale } = (await params) as { locale: Locale };
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "Auth" });
+  const labels = {
+    ...Object.fromEntries(LABELS.map((k) => [k, t(k)])),
+    ...Object.fromEntries(TEMPLATES.map((k) => [k, t.raw(k) as string])),
+  } as Parameters<typeof SignInForm>[0]["labels"];
   return (
     <div className="mx-auto w-full max-w-sm px-4 py-12">
-      <h1 className="text-3xl font-bold tracking-tight">{t("heading")}</h1>
-      <p className="mt-2 mb-6 text-muted-foreground">{t("intro")}</p>
-      <SignInForm
-        locale={locale}
-        callbackPath={`/${locale}/account`}
-        labels={{
-          email: t("email"),
-          emailPlaceholder: t("emailPlaceholder"),
-          send: t("send"),
-          sending: t("sending"),
-          sent: t.raw("sent") as string,
-          or: t("or"),
-          google: t("google"),
-          error: t("error"),
-          notConfigured: t("notConfigured"),
-        }}
-      />
+      <h1 className="mb-2 text-3xl font-bold tracking-tight">{t("heading")}</h1>
+      <SignInForm locale={locale} callbackPath={`/${locale}/account`} labels={labels} />
       <p className="mt-6 text-xs text-muted-foreground">{t("terms")}</p>
     </div>
   );

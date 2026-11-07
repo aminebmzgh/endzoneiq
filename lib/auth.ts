@@ -6,7 +6,7 @@ import { magicLink } from "better-auth/plugins/magic-link";
 import { account, profiles, session, user, verification } from "@/db/schema";
 import { routing } from "@/i18n/routing";
 import { getDb } from "@/lib/db";
-import { magicLinkEmail, sendEmail } from "@/lib/email";
+import { actionEmail, magicLinkEmail, sendEmail } from "@/lib/email";
 import { serverEnv } from "@/lib/env";
 
 /** The locale a sign-in started from, read from its callback URL (/fr/account -> fr). */
@@ -38,12 +38,38 @@ function createAuth() {
       schema: { user, session, account, verification },
     }),
     socialProviders: google,
+    // Email + password. A new account confirms its email once (prevents someone from
+    // registering another person's address with their own password); after that,
+    // sign-in is email + password only. Accounts created by magic link have no password
+    // until they set one through "forgot password".
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      requireEmailVerification: true,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user: u, url }) => {
+        await sendEmail(actionEmail("resetPassword", u.email, url, localeFromUrl(url)));
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: true, // signing in before confirming re-sends the link
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60 * 24,
+      sendVerificationEmail: async ({ user: u, url }) => {
+        await sendEmail(actionEmail("verifyEmail", u.email, url, localeFromUrl(url)));
+      },
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // refreshed at most daily
     },
     // In-memory limits suit the single Node process (see BACKLOG for multi-process).
-    rateLimit: { enabled: true, window: 60, max: 60 },
+    // Production only (tests and dev sign in many times in a row). Better Auth adds
+    // stricter limits on sign-in and password-reset routes (brute-force protection).
+    rateLimit: { enabled: process.env.NODE_ENV === "production", window: 60, max: 60 },
     advanced: { useSecureCookies: process.env.NODE_ENV === "production" },
     databaseHooks: {
       user: {

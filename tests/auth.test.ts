@@ -18,11 +18,15 @@ vi.mock("@/lib/email", async (orig) => ({
 }));
 
 const SITE = "http://localhost:3000";
-const EMAILS = ["authtest-user@test.endzoneiq", "authtest-admin@test.endzoneiq"];
+const EMAILS = [
+  "authtest-user@test.endzoneiq",
+  "authtest-admin@test.endzoneiq",
+  "authtest-password@test.endzoneiq",
+];
 
 async function cleanup() {
   const c = await connect();
-  await c.query("DELETE FROM user WHERE email IN (?, ?)", EMAILS);
+  await c.query("DELETE FROM user WHERE email IN (?, ?, ?)", EMAILS);
   await c.query("DELETE FROM verification WHERE identifier LIKE '%'");
   await c.end();
 }
@@ -95,5 +99,86 @@ describe.runIf(await dbReachable())("better auth magic link", () => {
     )) as unknown as [[{ role: string }]];
     await c.end();
     expect(p.role).toBe("admin");
+  });
+});
+
+describe.runIf(await dbReachable())("email and password", () => {
+  const EMAIL = EMAILS[2]!;
+  const call = async (path: string, body?: object, method = "POST") => {
+    const { getAuth } = await import("@/lib/auth");
+    return getAuth().handler(
+      new Request(`${SITE}/api/auth${path}`, {
+        method,
+        headers: { "content-type": "application/json", origin: SITE },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }),
+    );
+  };
+  const linkFor = (to: string) =>
+    /https?:\/\/\S+/.exec(sent.findLast((m) => m.to === to)!.text)![0];
+  const cookieOf = (res: Response) =>
+    res.headers
+      .getSetCookie()
+      .map((c) => c.split(";")[0])
+      .join("; ");
+
+  it("signs up, confirms the email once, then signs in with the password", async () => {
+    const up = await call("/sign-up/email", {
+      email: EMAIL,
+      password: "correct horse battery",
+      name: "Pat",
+      callbackURL: "/es/account",
+    });
+    expect(up.status).toBe(200);
+    expect(sent.findLast((m) => m.to === EMAIL)!.text).toContain("Confirma tu correo");
+
+    // Before confirming: refused, and the confirmation link is sent again.
+    const early = await call("/sign-in/email", { email: EMAIL, password: "correct horse battery" });
+    expect(early.status).toBe(403);
+
+    const { getAuth } = await import("@/lib/auth");
+    const verified = await getAuth().handler(
+      new Request(linkFor(EMAIL), { headers: { origin: SITE } }),
+    );
+    expect([200, 302]).toContain(verified.status);
+
+    const ok = await call("/sign-in/email", { email: EMAIL, password: "correct horse battery" });
+    expect(ok.status).toBe(200);
+    const { getViewer } = await import("@/lib/authz");
+    expect(await getViewer(new Headers({ cookie: cookieOf(ok) }))).toMatchObject({ email: EMAIL });
+
+    const bad = await call("/sign-in/email", { email: EMAIL, password: "wrong password!" });
+    expect(bad.status).toBe(401);
+    const short = await call("/sign-up/email", {
+      email: "x@test.endzoneiq",
+      password: "short",
+      name: "x",
+    });
+    expect(short.status).toBe(400);
+  });
+
+  it("lets a magic-link account set its first password through reset", async () => {
+    const email = EMAILS[0]!; // created by magic link above, no password yet
+    expect((await call("/sign-in/email", { email, password: "anything at all" })).status).toBe(401);
+
+    const req = await call("/request-password-reset", { email, redirectTo: "/fr/reset-password" });
+    expect(req.status).toBe(200);
+    const { getAuth } = await import("@/lib/auth");
+    const landing = await getAuth().handler(
+      new Request(linkFor(email), { headers: { origin: SITE } }),
+    );
+    expect(landing.status).toBe(302);
+    const token = new URL(landing.headers.get("location")!, SITE).searchParams.get("token")!;
+    expect(new URL(landing.headers.get("location")!, SITE).pathname).toBe("/fr/reset-password");
+    expect(sent.findLast((m) => m.to === email)!.text).toContain("mot de passe");
+
+    expect((await call("/reset-password", { newPassword: "my new password", token })).status).toBe(
+      200,
+    );
+    expect((await call("/sign-in/email", { email, password: "my new password" })).status).toBe(200);
+    // The token works once.
+    expect((await call("/reset-password", { newPassword: "another password", token })).status).toBe(
+      400,
+    );
   });
 });
