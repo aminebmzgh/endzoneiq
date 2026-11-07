@@ -21,16 +21,14 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-async function Admin() {
-  const viewer = await getViewer(await headers());
-  if (!isAdmin(viewer)) notFound(); // non-admins never learn the page exists
+async function Admin({ email }: { email: string }) {
   const o = await adminOverview();
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Signed in as {viewer!.email}. Overrides apply to the next prediction of their game; saving
-        one starts a re-prediction. Picks of kicked-off games are locked.
+        Signed in as {email}. Overrides apply to the next prediction of their game; saving one
+        starts a re-prediction. Picks of kicked-off games are locked.
       </p>
 
       <Card title="Re-predict">
@@ -163,7 +161,15 @@ async function Admin() {
   );
 }
 
-export default function AdminPage() {
+/**
+ * Checks access before rendering anything, so non-admins get a real 404 (status and
+ * body) and never see that the page exists. Blocking on purpose: an internal page.
+ */
+export const instant = false;
+
+export default async function AdminPage() {
+  const viewer = await getViewer(await headers());
+  if (!isAdmin(viewer)) notFound();
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
       <h1 className="mb-4 text-2xl font-bold">
@@ -172,7 +178,7 @@ export default function AdminPage() {
       <Suspense
         fallback={<div aria-busy="true" className="h-64 rounded-lg border border-border bg-card" />}
       >
-        <Admin />
+        <Admin email={viewer!.email} />
       </Suspense>
     </main>
   );
