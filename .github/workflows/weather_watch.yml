@@ -1,0 +1,51 @@
+# Weather watch (spec 12.1): kickoff-hour forecasts for outdoor games in the next 72
+# hours (Open-Meteo), then re-predict the week with them.
+name: Weather watch
+
+on:
+  schedule:
+    - cron: "30 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weather-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Forecasts, then re-predict
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_MODEL_FAST: ${{ vars.CLAUDE_MODEL_FAST }}
+      PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.cache/nflverse
+          key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
+          restore-keys: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-
+      - run: uv sync --locked --no-dev
+      - name: Post forecasts
+        run: uv run --no-dev python -m endzoneiq_pipeline.jobs.weather_watch
+      - name: Re-predict the week
+        env:
+          PUBLISH: ${{ vars.PUBLISH_ENABLED == 'true' }}
+        run: |
+          args=(--out picks.json)
+          [[ "$PUBLISH" == "true" ]] || { args+=(--dry-run); echo "PUBLISH_ENABLED is not true: dry run."; }
+          uv run --no-dev python -m endzoneiq_pipeline.jobs.publish_week "${args[@]}"

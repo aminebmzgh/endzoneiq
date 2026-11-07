@@ -39,6 +39,18 @@ const serverEnvSchema = z.object({
   CHAT_LIMIT_FREE: z.coerce.number().int().min(0).default(3),
   CHAT_LIMIT_PRO: z.coerce.number().int().min(0).default(50),
 
+  // --- Alerts and cron (Phase 7) ---
+  /** Bearer token for /api/internal/cron/* (Hostinger cron jobs). */
+  CRON_SECRET: z.string().min(32).optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  /** Fine-grained token limited to this repo's Actions (admin "Re-predict"). */
+  GITHUB_TOKEN: z.string().optional(),
+  GITHUB_REPO: z
+    .string()
+    .regex(/^[\w.-]+\/[\w.-]+$/)
+    .default("aminebmzgh/endzoneiq"),
+
   // --- Email (Resend). Without a key, magic links are logged in development only. ---
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("EndzoneIQ <hello@endzoneiq.com>"),

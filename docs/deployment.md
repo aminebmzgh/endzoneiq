@@ -298,8 +298,27 @@ timezone; check it in hPanel and convert from US Eastern. Store the secret in a 
 | daily 03:00                    | `curl -fsS -X POST -H "Authorization: Bearer $(cat ~/.endzoneiq_cron)" https://endzoneiq.com/api/internal/cron/integrity-check` |
 | daily 04:00                    | `curl -fsS -X POST -H "Authorization: Bearer $(cat ~/.endzoneiq_cron)" https://endzoneiq.com/api/internal/cron/cleanup`         |
 
-The weekly-email endpoint checks the Eastern time window itself, so the cron line can simply
-run every 5 minutes on Tuesdays.
+The weekly-email endpoint checks the Eastern time window itself (Tuesday 12:00–16:00 ET), so
+the cron line can simply run every 15 minutes on Tuesdays.
+
+**Phase 7 environment variables** (hPanel; then re-run the latest Deploy workflow, because
+saving variables doesn't restart the running processes):
+
+- `CRON_SECRET`: as above.
+- `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`: web push. Generate with
+  `node -e "console.log(require('web-push').generateVAPIDKeys())"`. Changing them drops
+  every existing push subscription.
+- `GITHUB_TOKEN`: for the admin "Re-predict" button. Use a fine-grained personal access
+  token with only this repository and **Actions: Read and write**. Optional, defaults
+  shown: `GITHUB_REPO=aminebmzgh/endzoneiq`.
+
+**GitHub Actions (pipeline):**
+
+- `repredict.yml`: started by the admin screen.
+- `injury_watch.yml`: Wednesday to Saturday every 2 h, Sunday morning every 15 min.
+- `weather_watch.yml`: every 6 h.
+
+They publish only when the repository variable `PUBLISH_ENABLED=true`, like `publish_week.yml`.
 
 ## 7. Fallback if Hostinger rejects the prebuilt package
 

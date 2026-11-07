@@ -29,7 +29,7 @@ export default async function PricingPage({ params }: PageProps<"/[locale]/prici
     [t("featPicks"), t("all"), t("all")],
     [t("featBreakdown"), t("featBreakdownFree"), t("all")],
     [t("featProjections"), false, true],
-    [t("featAlerts"), false, t("soon")],
+    [t("featAlerts"), false, true],
     [t("featAssistant"), t("featAssistantFree"), t("featAssistantPro")],
     [t("featRecord"), true, true],
   ];

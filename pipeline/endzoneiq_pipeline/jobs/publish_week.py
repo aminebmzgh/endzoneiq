@@ -31,6 +31,7 @@ import pandas as pd
 from endzoneiq_pipeline.config import Settings
 from endzoneiq_pipeline.games import chunked
 from endzoneiq_pipeline.jobs.backtest import assert_no_leakage
+from endzoneiq_pipeline.live import apply_forecasts, apply_overrides
 from endzoneiq_pipeline.model.data import load_all
 from endzoneiq_pipeline.model.explain import explain
 from endzoneiq_pipeline.model.features import FEATURES, build_features
@@ -197,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--season", type=int)
     p.add_argument("--week", type=int)
+    p.add_argument("--games", help="comma-separated game ids (re-predict only these)")
     p.add_argument("--model-dir", type=Path, help="use local model files instead of the release")
     p.add_argument("--dry-run", action="store_true", help="build picks, don't post them")
     p.add_argument("--out", type=Path, default=Path("picks.json"))
@@ -228,11 +230,23 @@ def main(argv: list[str] | None = None) -> int:
         now = datetime.now(UTC)
         current_season = NflverseSchedules().current_season()
         data = load_all(max(current_season, args.season or 0))
+        # Live inputs from the site: admin injury overrides and stored forecasts.
+        overrides = export.get("injuryOverrides", [])
+        data["schedules"], data["injuries"] = apply_overrides(
+            data["schedules"], data["injuries"], overrides, now
+        )
+        data["schedules"] = apply_forecasts(data["schedules"], export.get("weather", []))
+        if overrides:
+            log.info("applied %s admin injury overrides", len(overrides))
         features = build_features(
             data["schedules"], data["team_games"], data["qb_games"], data["injuries"]
         )
         assert_no_leakage(features)
-        games = target_games(features, now, args.season, args.week)
+        if args.games:
+            wanted = set(args.games.split(","))
+            games = features[features["game_id"].isin(wanted)]
+        else:
+            games = target_games(features, now, args.season, args.week)
         if games.empty:
             log.info("no games to predict")
             return 0

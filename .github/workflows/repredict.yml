@@ -1,0 +1,64 @@
+# Re-predict (spec 8, 12.1): started by the admin screen (workflow_dispatch from the site,
+# with a fine-grained token limited to this repo's Actions) after an injury override or
+# a "Re-predict" click. Applies the site's admin overrides and stored forecasts, and
+# posts the picks; the site creates a new version only on a material change, and the
+# change triggers pick-change alerts.
+name: Re-predict
+run-name: Re-predict ${{ inputs.game_id || 'week' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_id:
+        description: "nflverse game id (empty = the whole upcoming week)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repredict-${{ inputs.game_id || 'week' }}
+  cancel-in-progress: false
+
+jobs:
+  repredict:
+    name: Predict, explain, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_MODEL_FAST: ${{ vars.CLAUDE_MODEL_FAST }}
+      PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.cache/nflverse
+          key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
+          restore-keys: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-
+      - run: uv sync --locked --no-dev
+      - name: Re-predict
+        env:
+          GAME_ID: ${{ inputs.game_id }}
+          PUBLISH: ${{ vars.PUBLISH_ENABLED == 'true' }}
+        run: |
+          args=(--out picks.json)
+          [[ -n "$GAME_ID" ]] && args+=(--games "$GAME_ID")
+          [[ "$PUBLISH" == "true" ]] || { args+=(--dry-run); echo "PUBLISH_ENABLED is not true: dry run."; }
+          uv run --no-dev python -m endzoneiq_pipeline.jobs.publish_week "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: picks
+          path: pipeline/picks.json
+          if-no-files-found: ignore

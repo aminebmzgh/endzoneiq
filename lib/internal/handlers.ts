@@ -12,6 +12,7 @@ import {
   seasons,
   teams,
   teamWeekStats,
+  weather,
 } from "@/db/schema";
 import { tags } from "@/lib/cache-tags";
 import { getDb } from "@/lib/db";
@@ -19,11 +20,16 @@ import { serverEnv } from "@/lib/env";
 import { gamesDigest } from "@/lib/games/digest";
 import { seasonDigestRows, upsertGames, upsertSeasons } from "@/lib/games/repository";
 import { InternalApiError, internalRoute } from "./route";
+import { queueAdminEmail, queuePickChangeAlerts } from "@/lib/notify/alerts";
+import { processQueue } from "@/lib/notify/queue";
 import { gradeFinishedGames, type GradeResult } from "@/lib/picks/grading";
 import { publishPicks } from "@/lib/picks/repository";
+import { upsertPlayersInjuries, upsertWeather } from "@/lib/live/repository";
 import {
   ingestGamesBody,
   ingestPicksBody,
+  ingestPlayersInjuriesBody,
+  ingestWeatherBody,
   ingestResultsBody,
   ingestTeamStatsBody,
   modelVersionBody,
@@ -35,6 +41,19 @@ import {
  * re-export these (GET routes call `connection()` first so they are never
  * prerendered), which keeps them easy to test.
  */
+
+/**
+ * Queue notifications and send what fits in a few seconds. Never fails the request
+ * that caused them: whatever isn't sent here goes out with cron/notifications.
+ */
+async function notifySafely(queue: () => Promise<unknown>) {
+  try {
+    await queue();
+    await processQueue({ budgetMs: 8_000, limit: 100 });
+  } catch (err) {
+    console.error("[notify] failed (cron/notifications will retry)", err);
+  }
+}
 
 /** POST /api/internal/ingest/games: upsert schedule, scores and status (idempotent). */
 export const ingestGames = internalRoute(
@@ -98,7 +117,21 @@ export const pipelineRun = internalRoute(
           runUrl: sql`COALESCE(VALUES(${pipelineRuns.runUrl}), ${pipelineRuns.runUrl})`,
         },
       });
-    // Failure alert emails (Resend) arrive in Phase 7.
+    if (body.status === "failure") {
+      await notifySafely(async () => {
+        await queueAdminEmail(
+          `run-failed:${body.id}`,
+          `Pipeline job failed: ${body.job}`,
+          [
+            `Job: ${body.job}`,
+            `Run: ${body.id}`,
+            body.runUrl ?? "",
+            "",
+            body.error ?? "(no error message)",
+          ].join("\n"),
+        );
+      });
+    }
     return { rows: 1, data: { ok: true } };
   },
 );
@@ -110,17 +143,21 @@ export const pipelineRun = internalRoute(
 export const exportState = internalRoute({ endpoint: "export" }, async () => {
   const db = getDb();
   const now = new Date();
-  const [seasonRows, overrides, currentPicks, [activeModel]] = await Promise.all([
+  const [seasonRows, overrides, currentPicks, [activeModel], forecasts] = await Promise.all([
     db.select().from(seasons),
     db
       .select({
         gameId: injuries.gameId,
         gsisId: players.gsisId,
+        name: players.name,
+        position: players.position,
+        team: teams.abbr,
         status: injuries.reportStatus,
         updatedAt: injuries.updatedAt,
       })
       .from(injuries)
       .innerJoin(players, eq(players.id, injuries.playerId))
+      .leftJoin(teams, eq(teams.id, players.teamId))
       .innerJoin(games, eq(games.id, injuries.gameId))
       .where(and(eq(injuries.source, "admin"), gt(games.kickoffAt, now))),
     db
@@ -140,6 +177,16 @@ export const exportState = internalRoute({ endpoint: "export" }, async () => {
       .from(modelVersions)
       .where(eq(modelVersions.isActive, true))
       .limit(1),
+    db
+      .select({
+        gameId: weather.gameId,
+        tempC: weather.tempC,
+        windKph: weather.windKph,
+        fetchedAt: weather.fetchedAt,
+      })
+      .from(weather)
+      .innerJoin(games, eq(games.id, weather.gameId))
+      .where(gt(games.kickoffAt, now)),
   ]);
   return {
     rows: 0,
@@ -149,6 +196,7 @@ export const exportState = internalRoute({ endpoint: "export" }, async () => {
       activeModel: activeModel ?? null,
       seasons: seasonRows.map(({ year, currentWeek, phase }) => ({ year, currentWeek, phase })),
       injuryOverrides: overrides,
+      weather: forecasts,
       currentPicks,
     },
   };
@@ -216,6 +264,10 @@ export const ingestPicks = internalRoute(
     if (created.length > 0) {
       revalidateTag(tags.picks, "max");
       for (const r of created) revalidateTag(tags.game(r.gameId), "max");
+      // Changed picks: alert Pro users now, not at the next cron run (spec 7: < 10 min).
+      await notifySafely(() =>
+        queuePickChangeAlerts(created.map((r) => ({ gameId: r.gameId, versionNo: r.versionNo! }))),
+      );
     }
     const count = (s: string) => results.filter((r) => r.status === s).length;
     return {
@@ -304,5 +356,29 @@ export const ingestTeamStats = internalRoute(
       revalidateTag(tags.teams, "max");
     }
     return { rows: changed.length, data: { received: values.length, changed: changed.length } };
+  },
+);
+
+/** POST /api/internal/ingest/players-injuries: latest nflverse injury reports (injury_watch). */
+export const ingestPlayersInjuries = internalRoute(
+  {
+    endpoint: "ingest/players-injuries",
+    schema: ingestPlayersInjuriesBody,
+    maxBytes: 4 * 1024 * 1024,
+  },
+  async ({ body }) => {
+    const result = await upsertPlayersInjuries(body);
+    for (const id of result.changedGames) revalidateTag(tags.game(id), "max");
+    return { rows: result.rows, data: result };
+  },
+);
+
+/** POST /api/internal/ingest/weather: forecasts for upcoming outdoor games (weather_watch). */
+export const ingestWeather = internalRoute(
+  { endpoint: "ingest/weather", schema: ingestWeatherBody },
+  async ({ body }) => {
+    const result = await upsertWeather(body);
+    for (const id of result.changedGames) revalidateTag(tags.game(id), "max");
+    return { rows: result.rows, data: result };
   },
 );

@@ -240,7 +240,20 @@
     "save": "Enregistrer",
     "saved": "Enregistré",
     "error": "Une erreur s'est produite. Veuillez réessayer.",
-    "adminAccess": "Accès Pro (admin)"
+    "adminAccess": "Accès Pro (admin)",
+    "alertsHeading": "Alertes",
+    "push": "Notifications push sur cet appareil",
+    "pushOn": "Les notifications push sont activées sur cet appareil.",
+    "enablePush": "Activer",
+    "disablePush": "Désactiver",
+    "pushUnsupported": "Ce navigateur ne peut pas recevoir de notifications push. Sur iPhone, ajoutez d'abord EndzoneIQ à l'écran d'accueil (Partager → Sur l'écran d'accueil).",
+    "pushDenied": "Les notifications sont bloquées pour ce site. Autorisez-les dans les réglages du site de votre navigateur.",
+    "pickChange": "Me prévenir quand un pronostic change",
+    "pickChangeEmail": "M'envoyer aussi un e-mail quand un pronostic change",
+    "weekly": "E-mail hebdomadaire des pronostics (le mardi)",
+    "teams": "Seulement ces équipes (aucune = tous les matchs)",
+    "proOnly": "Les alertes de changement de pronostic font partie de Pro.",
+    "saveAlerts": "Enregistrer les alertes"
   },
   "Pricing": {
     "heading": "Tarifs",

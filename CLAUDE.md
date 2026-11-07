@@ -12,16 +12,17 @@ in `BACKLOG.md`, never into the code.
 
 ## Status
 
-| Phase              | Status                                                                          |
-| ------------------ | ------------------------------------------------------------------------------- |
-| 0 Setup            | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions   |
-| 1 Data foundation  | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested    |
-| 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)          |
-| 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
-| 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
-| 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)  |
-| 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES      |
-| 7–8                | Not started                                                                     |
+| Phase              | Status                                                                            |
+| ------------------ | --------------------------------------------------------------------------------- |
+| 0 Setup            | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions     |
+| 1 Data foundation  | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested      |
+| 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)            |
+| 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations         |
+| 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below)   |
+| 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)    |
+| 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES        |
+| 7 Live and alerts  | ✅ Code done 2026-11-07. Watchers, admin overrides, re-predict, push/email alerts |
+| 8                  | Not started                                                                       |
 
 ## Stack
 
@@ -64,7 +65,9 @@ pipeline/            Python package endzoneiq_pipeline (site_client, games, sour
                      narrative*.py: explanations) + tests
 docs/                deployment.md, internal-api.md, model-card.md, backtest.md (generated)
 .github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml, grade_picks.yml,
-                     publish_week.yml
+                     publish_week.yml, repredict.yml, injury_watch.yml, weather_watch.yml,
+                     lighthouse.yml
+app/admin/           admin screen (English, own root layout, 404 for non-admins)
 proxy.ts             next-intl locale detection/redirect (Next 16 renamed middleware → proxy)
 ```
 
@@ -344,3 +347,25 @@ re-uploads a previous run's artifact.
     (`CHAT_LIMIT_FREE` 3, `CHAT_LIMIT_PRO` 50, admins 500). A failed answer gives the
     question back.
   - Threads are readable only by their owner; tokens are logged per answer.
+- **2026-11-07 Live updates (Phase 7).** Watchers post to the site, then run `publish_week`.
+  The site only versions a pick on a material change.
+  - `injury_watch` (nflverse reports plus the listed starting QBs) and `weather_watch`
+    (Open-Meteo, outdoor games within 72 h) do the posting.
+  - Admin overrides live in `injuries` with `source = admin` and reach the model through
+    `/api/internal/export` (`pipeline/endzoneiq_pipeline/live.py`).
+  - A starting QB marked out is replaced by an unknown backup (that's what `qb_delta`
+    measures). QBs weigh 0 in `injury_diff` by design.
+  - Saving an override dispatches `repredict.yml` through the GitHub API
+    (`GITHUB_TOKEN`, fine-grained, Actions only).
+- **2026-11-07 Alerts:** pick-change alerts go to Pro users and admins (push on by default
+  once a device is registered, email opt-in), for followed teams (none = all). The weekly
+  email is opt-in for everyone.
+  - Alerts are queued with a unique dedupe key and sent immediately after the ingest that
+    created them; `cron/notifications` is the backstop.
+  - A queue row is claimed by one worker (`queued` → `sending`). 404/410 push endpoints are
+    deleted.
+  - Notification text lives in `lib/notify/copy.ts`, not messages/, because it's built
+    outside page renders.
+- **2026-11-07 Admin is `/admin`, English only**, with its own root layout outside
+  `[locale]`. Non-admins get a 404, and admin APIs answer 404 too. Every override and
+  re-predict is written to `audit_log`.

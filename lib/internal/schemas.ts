@@ -144,3 +144,46 @@ export const ingestTeamStatsBody = z.object({
   week: z.number().int().min(0).max(25),
   teams: z.array(teamStatInput).min(1).max(32),
 });
+
+// --- Players, injuries, weather (Phase 7) ---------------------------------------
+
+const gameId = z.string().regex(/^\d{4}_\d{2}_[A-Z]{2,3}_[A-Z]{2,3}$/, "nflverse game id");
+const gsisId = z.string().min(3).max(16);
+
+/**
+ * POST /api/internal/ingest/players-injuries: the latest nflverse injury report for some
+ * games. For each game in `games`, the stored nflverse rows are replaced by `injuries`
+ * (admin overrides are never touched).
+ */
+export const ingestPlayersInjuriesBody = z.object({
+  games: z.array(gameId).min(1).max(40),
+  players: z
+    .array(
+      z.object({
+        gsisId,
+        name: z.string().min(1).max(80),
+        position: z.string().max(8),
+        team: abbr,
+      }),
+    )
+    .max(3000),
+  injuries: z
+    .array(z.object({ gameId, gsisId, status: z.enum(["out", "doubtful", "questionable"]) }))
+    .max(3000),
+});
+
+/** POST /api/internal/ingest/weather: forecasts for upcoming outdoor games. */
+export const ingestWeatherBody = z.object({
+  forecasts: z
+    .array(
+      z.object({
+        gameId,
+        tempC: z.number().min(-50).max(60).nullable(),
+        windKph: z.number().min(0).max(250).nullable(),
+        precipMm: z.number().min(0).max(500).nullable(),
+        condition: z.string().max(32).nullable(),
+      }),
+    )
+    .min(1)
+    .max(64),
+});

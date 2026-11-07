@@ -1,0 +1,1 @@
+ALTER TABLE `notification_queue` MODIFY COLUMN `status` enum('queued','sending','sent','failed','skipped') NOT NULL DEFAULT 'queued';

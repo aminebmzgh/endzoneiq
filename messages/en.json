@@ -240,7 +240,20 @@
     "save": "Save",
     "saved": "Saved",
     "error": "Something went wrong. Please try again.",
-    "adminAccess": "Pro access (admin)"
+    "adminAccess": "Pro access (admin)",
+    "alertsHeading": "Alerts",
+    "push": "Push notifications on this device",
+    "pushOn": "Push notifications are on for this device.",
+    "enablePush": "Turn on",
+    "disablePush": "Turn off",
+    "pushUnsupported": "This browser can't receive push notifications. On iPhone, add EndzoneIQ to your Home Screen first (Share → Add to Home Screen).",
+    "pushDenied": "Notifications are blocked for this site. Allow them in your browser's site settings.",
+    "pickChange": "Notify me when a pick changes",
+    "pickChangeEmail": "Also email me when a pick changes",
+    "weekly": "Weekly picks email (Tuesdays)",
+    "teams": "Only these teams (none selected = every game)",
+    "proOnly": "Pick-change alerts are part of Pro.",
+    "saveAlerts": "Save alerts"
   },
   "Pricing": {
     "heading": "Pricing",

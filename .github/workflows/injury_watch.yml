@@ -1,0 +1,55 @@
+# Injury watch (spec 12.1): post the latest injury reports for the upcoming week, then
+# re-predict it. The site only creates a new pick version on a material change
+# (winner flips or win probability moves >= 5 points) and alerts Pro users.
+name: Injury watch
+
+on:
+  schedule:
+    # Wed-Sat every 2 hours.
+    - cron: "0 */2 * * 3-6"
+    # Sunday 07:00-13:00 US Eastern every 15 minutes = 12:00-17:45 UTC in winter (EST).
+    - cron: "*/15 12-17 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: injury-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Injuries, then re-predict
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_MODEL_FAST: ${{ vars.CLAUDE_MODEL_FAST }}
+      PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.cache/nflverse
+          key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
+          restore-keys: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-
+      - run: uv sync --locked --no-dev
+      - name: Post injury reports
+        run: uv run --no-dev python -m endzoneiq_pipeline.jobs.injury_watch
+      - name: Re-predict the week
+        env:
+          PUBLISH: ${{ vars.PUBLISH_ENABLED == 'true' }}
+        run: |
+          args=(--out picks.json)
+          [[ "$PUBLISH" == "true" ]] || { args+=(--dry-run); echo "PUBLISH_ENABLED is not true: dry run."; }
+          uv run --no-dev python -m endzoneiq_pipeline.jobs.publish_week "${args[@]}"

@@ -8,6 +8,7 @@ import {
   PreferencesForm,
   SignOutButton,
 } from "@/components/account/account-actions";
+import { AlertsPanel } from "@/components/account/alerts-panel";
 import { Link } from "@/components/locale-link";
 import { TEAMS } from "@/db/seed/reference-data";
 import type { Locale } from "@/i18n/routing";
@@ -40,6 +41,7 @@ async function AccountContent({
   const date = (iso: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(iso));
   const sub = account.subscription;
+  const sortedTeams = [...TEAMS].sort((a, b) => a.abbr.localeCompare(b.abbr));
   const status =
     !sub || account.plan === "free"
       ? null
@@ -88,9 +90,7 @@ async function AccountContent({
         <h2 className="mb-3 font-semibold">{t("preferences")}</h2>
         <PreferencesForm
           initial={{ locale: account.locale, favoriteTeam: account.favoriteTeam }}
-          teams={[...TEAMS]
-            .sort((a, b) => a.city.localeCompare(b.city))
-            .map((x) => ({ abbr: x.abbr, name: `${x.city} ${x.name}` }))}
+          teams={sortedTeams.map((x) => ({ abbr: x.abbr, name: `${x.city} ${x.name}` }))}
           labels={{
             language: t("language"),
             favoriteTeam: t("favoriteTeam"),
@@ -99,6 +99,29 @@ async function AccountContent({
             saved: t("saved"),
             error: t("error"),
             languages: { en: "English", fr: "Français", es: "Español" },
+          }}
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5">
+        <h2 className="mb-3 font-semibold">{t("alertsHeading")}</h2>
+        <AlertsPanel
+          teams={sortedTeams.map((x) => ({ abbr: x.abbr, name: x.name }))}
+          labels={{
+            push: t("push"),
+            pushOn: t("pushOn"),
+            enablePush: t("enablePush"),
+            disablePush: t("disablePush"),
+            pushUnsupported: t("pushUnsupported"),
+            pushDenied: t("pushDenied"),
+            pickChange: t("pickChange"),
+            pickChangeEmail: t("pickChangeEmail"),
+            weekly: t("weekly"),
+            teams: t("teams"),
+            proOnly: t("proOnly"),
+            save: t("saveAlerts"),
+            saved: t("saved"),
+            error: t("error"),
           }}
         />
       </section>

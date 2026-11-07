@@ -142,7 +142,48 @@ Public pages are static entries that live in the server's cache (see CLAUDE.md, 
 | `ingest/team-stats`    | `teams`                                                    |
 | `ingest/model-version` | `model`                                                    |
 
-## Coming in later phases
+### `POST /api/internal/ingest/players-injuries`
 
-`ingest/players-injuries`, `ingest/weather`, `ingest/odds` and `cron/*` with `CRON_SECRET`
-(Phase 7). They reuse `internalRoute()` from `lib/internal/route.ts`.
+`{ games: [gameId], players: [{ gsisId, name, position, team }], injuries: [{ gameId, gsisId, status }] }`.
+Sent by `injury_watch` for the upcoming week. `status` is `out`, `doubtful` or `questionable`.
+
+- Players are upserted by `gsis_id`, including each team's listed starting QB (so the admin
+  screen can mark a QB out).
+- For every game in `games`, the stored nflverse rows are replaced by this report. Admin
+  overrides (`source = admin`) are never touched.
+- Unchanged rows aren't written. Response: `{ changedGames, rows }`; changed games are
+  revalidated.
+
+### `POST /api/internal/ingest/weather`
+
+`{ forecasts: [{ gameId, tempC, windKph, precipMm, condition }] }` (at most 64). Sent by
+`weather_watch` for outdoor games in the next 72 hours (Open-Meteo, kickoff hour). Only
+changed forecasts are written.
+
+### `GET /api/internal/export` (Phase 7 fields)
+
+- `injuryOverrides`: `{ gameId, gsisId, name, position, team, status }` for upcoming games.
+  `publish_week` applies them before building features (`pipeline/endzoneiq_pipeline/live.py`).
+  A listed starting QB marked `out` is replaced by an unknown backup.
+- `weather`: stored forecasts for upcoming games, used as the game's wind and temperature.
+
+## Cron (`/api/internal/cron/*`)
+
+Called by Hostinger cron with `Authorization: Bearer $CRON_SECRET` (POST). They aren't
+HMAC-signed, because cron can't sign; the bearer is compared in constant time. Without
+`CRON_SECRET` they answer 503.
+
+| Endpoint               | What it does                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `cron/notifications`   | Requeue stuck rows, then send queued push/email for up to 45 s                |
+| `cron/weekly-email`    | Tuesday 12:00–16:00 ET only: queue and send the weekly picks email            |
+| `cron/integrity-check` | Re-verify the whole hash chain; email the admins if it's broken               |
+| `cron/cleanup`         | Expired sessions/verifications, ingest log > 90 days, notifications > 30 days |
+
+Pick-change alerts are queued by `ingest/picks` when a new version is created, and sent
+immediately (8 s budget). `cron/notifications` sends anything left over.
+
+## Not built yet
+
+`ingest/odds` (only with `FEATURE_ODDS=true`). It would reuse `internalRoute()` from
+`lib/internal/route.ts`.

@@ -240,7 +240,20 @@
     "save": "Guardar",
     "saved": "Guardado",
     "error": "Algo salió mal. Inténtalo de nuevo.",
-    "adminAccess": "Acceso Pro (admin)"
+    "adminAccess": "Acceso Pro (admin)",
+    "alertsHeading": "Alertas",
+    "push": "Notificaciones push en este dispositivo",
+    "pushOn": "Las notificaciones push están activadas en este dispositivo.",
+    "enablePush": "Activar",
+    "disablePush": "Desactivar",
+    "pushUnsupported": "Este navegador no puede recibir notificaciones push. En iPhone, primero añade EndzoneIQ a la pantalla de inicio (Compartir → Añadir a pantalla de inicio).",
+    "pushDenied": "Las notificaciones están bloqueadas para este sitio. Permítelas en los ajustes del sitio de tu navegador.",
+    "pickChange": "Avísame cuando cambie un pronóstico",
+    "pickChangeEmail": "Envíame también un correo cuando cambie un pronóstico",
+    "weekly": "Correo semanal de pronósticos (los martes)",
+    "teams": "Solo estos equipos (ninguno = todos los partidos)",
+    "proOnly": "Las alertas de cambio de pronóstico son parte de Pro.",
+    "saveAlerts": "Guardar alertas"
   },
   "Pricing": {
     "heading": "Precios",

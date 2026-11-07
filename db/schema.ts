@@ -535,3 +535,71 @@ export const chatMessages = mysqlTable(
     index("chat_messages_user_day_idx").on(t.userId, t.role, t.createdAt),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Alerts and notifications (Phase 7)
+
+export const alertPrefs = mysqlTable("alert_prefs", {
+  userId: varchar("user_id", { length: 64 })
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** Push notification when a pick changes (Pro). */
+  notifyPickChange: boolean("notify_pick_change").notNull().default(true),
+  /** Email when a pick changes (Pro). */
+  notifyPickChangeEmail: boolean("notify_pick_change_email").notNull().default(false),
+  /** Weekly picks email (everyone). */
+  notifyWeekly: boolean("notify_weekly").notNull().default(false),
+  updatedAt: updatedAt(),
+});
+
+/** Teams a user follows for pick-change alerts. None = every game. */
+export const alertTeams = mysqlTable(
+  "alert_teams",
+  {
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    teamId: smallint("team_id")
+      .notNull()
+      .references(() => teams.id),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.teamId] })],
+);
+
+export const pushSubscriptions = mysqlTable(
+  "push_subscriptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: varchar("endpoint", { length: 768 }).notNull().unique(),
+    keysJson: jsonText<{ p256dh: string; auth: string }>("keys_json").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);
+
+export const notificationChannels = ["push", "email"] as const;
+/** queued -> sending (claimed by one worker) -> sent | failed (after 5 attempts) | skipped. */
+export const notificationStatuses = ["queued", "sending", "sent", "failed", "skipped"] as const;
+
+export const notificationQueue = mysqlTable(
+  "notification_queue",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    userId: varchar("user_id", { length: 64 }).references(() => user.id, { onDelete: "cascade" }),
+    /** For emails to people without an account row (admin alerts). */
+    toEmail: varchar("to_email", { length: 255 }),
+    channel: mysqlEnum("channel", notificationChannels).notNull(),
+    /** What happened, e.g. "pick:123:<user>:push": the same alert is never queued twice. */
+    dedupeKey: varchar("dedupe_key", { length: 191 }).notNull().unique(),
+    payloadJson: jsonText<Record<string, unknown>>("payload_json").notNull(),
+    status: mysqlEnum("status", notificationStatuses).notNull().default("queued"),
+    attempts: tinyint("attempts").notNull().default(0),
+    lastError: varchar("last_error", { length: 255 }),
+    createdAt: createdAt(),
+    sentAt: utcDatetime("sent_at"),
+  },
+  (t) => [index("notification_queue_status_idx").on(t.status, t.id)],
+);

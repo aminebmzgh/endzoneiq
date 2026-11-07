@@ -31,5 +31,5 @@ export default function proxy(req: NextRequest) {
 
 export const config = {
   // Localize everything except API routes, the admin area, Next internals and static files.
-  matcher: ["/((?!api|admin|_next|_vercel|.*\\..*).*)"],
+  matcher: ["/((?!api|admin|icon|_next|_vercel|.*\\..*).*)"],
 };
