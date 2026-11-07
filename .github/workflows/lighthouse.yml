@@ -1,5 +1,10 @@
-# Lighthouse (mobile) against production (spec Phase 4: >= 90 on home and game pages).
-# Run by hand after a deploy. Reports are uploaded as an artifact.
+# Lighthouse (mobile) for production via Google PageSpeed Insights (spec Phase 4:
+# >= 90 on home and game pages). Google runs Lighthouse on its own hardware, so scores
+# are comparable run to run. (Running Lighthouse on a GitHub runner doesn't work:
+# Hostinger's bot filter answers 403 to browsers from datacenter IPs.)
+#
+# Optional secret PSI_API_KEY (free, Google Cloud console, "PageSpeed Insights API"):
+# without it the shared keyless quota is often exhausted (HTTP 429).
 name: Lighthouse
 
 on:
@@ -15,50 +20,39 @@ permissions:
 
 jobs:
   lighthouse:
-    name: Mobile audit
+    name: PageSpeed Insights (mobile)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       SITE_URL: ${{ vars.SITE_URL }}
       MIN_PERF: ${{ inputs.min_performance }}
-      # Hostinger's bot filter answers 403 to Lighthouse's default "Chrome-Lighthouse" user agent.
-      UA: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"
+      PSI_API_KEY: ${{ secrets.PSI_API_KEY }}
     steps:
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-      - name: Pick pages
-        run: |
-          game=$(curl -fsS "$SITE_URL/sitemap.xml" | grep -o "$SITE_URL/en/game/[^<]*" | head -1)
-          echo "PAGES=$SITE_URL/en $SITE_URL/fr/record $game" >> "$GITHUB_ENV"
       - name: Audit
         run: |
-          npm install -g lighthouse@12.8.2
+          game=$(curl -fsS "$SITE_URL/sitemap.xml" | grep -o "$SITE_URL/en/game/[^<]*" | head -1)
           mkdir -p reports
           status=0
-          for url in $PAGES; do
+          for url in "$SITE_URL/en" "$game" "$SITE_URL/fr/record"; do
             # Warm the page cache first: a page renders once, then it's served from cache.
             curl -fsS -o /dev/null "$url"
             name=$(echo "$url" | sed 's|https\?://[^/]*/||; s|/|_|g')
-            # Headful Chrome on a virtual display: the host's bot filter rejects headless Chrome.
-            xvfb-run -a lighthouse "$url" --quiet --chrome-flags="--no-sandbox" \
-              --emulated-user-agent="$UA" \
-              --only-categories=performance,accessibility,best-practices,seo \
-              --output=json --output=html --output-path="reports/$name"
-            node -e '
-              const r = require(process.argv[1]);
-              const s = Object.fromEntries(Object.values(r.categories).map((c) => [c.id, Math.round(c.score * 100)]));
-              const a = r.audits;
-              console.log(process.argv[2], JSON.stringify(s),
-                "LCP", a["largest-contentful-paint"].displayValue,
-                "TBT", a["total-blocking-time"].displayValue,
-                "CLS", a["cumulative-layout-shift"].displayValue);
-              if (s.performance < Number(process.argv[3])) process.exit(1);
-            ' "$PWD/reports/$name.report.json" "$url" "$MIN_PERF" || status=1
+            q="url=$(jq -rn --arg u "$url" '$u|@uri')&strategy=mobile"
+            for c in performance accessibility best-practices seo; do q="$q&category=$c"; done
+            [[ -n "$PSI_API_KEY" ]] && q="$q&key=$PSI_API_KEY"
+            curl -sS --max-time 180 "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?$q" -o "reports/$name.json"
+            jq -e '.lighthouseResult' "reports/$name.json" > /dev/null || { jq '.error.message' "reports/$name.json"; status=1; continue; }
+            jq -r --arg url "$url" '.lighthouseResult as $l | "\($url) " +
+              ([$l.categories[] | "\(.id)=\(.score * 100 | round)"] | join(" ")) +
+              " LCP=\($l.audits["largest-contentful-paint"].displayValue)" +
+              " TBT=\($l.audits["total-blocking-time"].displayValue)" +
+              " CLS=\($l.audits["cumulative-layout-shift"].displayValue)"' "reports/$name.json"
+            perf=$(jq '.lighthouseResult.categories.performance.score * 100 | round' "reports/$name.json")
+            (( perf >= MIN_PERF )) || status=1
           done
           exit $status
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: lighthouse
+          name: pagespeed
           path: reports
