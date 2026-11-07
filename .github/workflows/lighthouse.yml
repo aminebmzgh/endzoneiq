@@ -21,6 +21,8 @@ jobs:
     env:
       SITE_URL: ${{ vars.SITE_URL }}
       MIN_PERF: ${{ inputs.min_performance }}
+      # Hostinger's bot filter answers 403 to Lighthouse's default "Chrome-Lighthouse" user agent.
+      UA: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"
     steps:
       - uses: actions/setup-node@v5
         with:
@@ -39,6 +41,7 @@ jobs:
             curl -fsS -o /dev/null "$url"
             name=$(echo "$url" | sed 's|https\?://[^/]*/||; s|/|_|g')
             lighthouse "$url" --quiet --chrome-flags="--headless=new --no-sandbox" \
+              --emulated-user-agent="$UA" \
               --only-categories=performance,accessibility,best-practices,seo \
               --output=json --output=html --output-path="reports/$name"
             node -e '
