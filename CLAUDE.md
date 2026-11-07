@@ -12,11 +12,11 @@ in `BACKLOG.md`, never into the code.
 
 ## Status
 
-| Phase             | Status                                                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 0 Setup           | Built and verified locally. **Live Hostinger deploy pending** (website not created yet, see `docs/deployment.md` §2) |
-| 1 Data foundation | Not started                                                                                                          |
-| 2–8               | Not started                                                                                                          |
+| Phase             | Status                                                                        |
+| ----------------- | ----------------------------------------------------------------------------- |
+| 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions |
+| 1 Data foundation | Not started                                                                   |
+| 2–8               | Not started                                                                   |
 
 ## Stack
 
@@ -118,9 +118,8 @@ re-uploads a previous run's artifact.
   pages plus `revalidateTag` replace classic ISR.
 - **2026-11-07 Node.js 24** (LTS) pinned in `.nvmrc`, `engines`, CI and the Hostinger build
   settings. Local dev on newer Node works but isn't what we ship.
-- **2026-11-07 Local DB is `mariadb:11.8`.** The Hostinger version can't be read through the
-  API; `/api/health` reports `db.version` after the first deploy. Update `docker-compose.yml`
-  and CI if it differs. SQL stays compatible with MariaDB 10.6+ and MySQL 8.
+- **2026-11-07 DB version: MariaDB 11.8** (production reports `11.8.9-MariaDB-log` via
+  `/api/health`); local docker and CI use `mariadb:11.8`.
 - **2026-11-07 Production DB** is the existing `u701027769_endzoneiq` (it has the TRIGGER
   privilege, so Phase 1 can enforce append-only picks with triggers). Connect via `127.0.0.1`.
 - **2026-11-07 Deploy package layout:** the standalone server goes in `server/` with a
@@ -132,9 +131,16 @@ re-uploads a previous run's artifact.
 - **2026-11-07 Hostinger deploy via plain `curl` + `jq`** against the REST API
   (`POST /api/hosting/v1/files/upload-urls` → TUS upload →
   `POST /api/hosting/v1/accounts/{user}/websites/{domain}/nodejs/builds` with
-  `source_type: archive`). No third-party CLI binary in CI. Response unwrapping is tolerant
-  (`.data // .`) because the field-level schema couldn't be fully verified; **the first live
-  deploy must confirm it.**
+  `source_type: archive`). No third-party CLI binary in CI. **Verified live:** Hostinger runs
+  the prebuilt package as-is (install = "audited 1 package", build = `echo prebuilt`, deploy
+  ~7 s). No fallback from spec §5A needed. Build responses are unwrapped (`.state`, `.uuid`);
+  the logs endpoint returns `{logs, lines}` where `lines` is the count returned per call.
+- **2026-11-07 Gotcha: deleting a Hostinger website does not kill its Node processes.** A
+  re-created site with the same domain kept serving the old app until its orphaned
+  `next-server` processes (cwd `domains/.removed-<domain>-*`) were killed over SSH
+  (`ssh -p 65002 u701027769@31.170.166.52`; local alias `endzoneiq-ssh`). Check
+  `ps -u $USER -o pid,lstart,args` and `readlink /proc/<pid>/cwd` if the live site doesn't
+  match the deployed SHA.
 - **2026-11-07 Build SHA** is baked in through `next.config.ts` `env.BUILD_SHA` (from
   `GITHUB_SHA`), so the smoke test can confirm exactly which commit is live.
 - **2026-11-07 `www` → apex:** handled at DNS/hPanel, with a `next.config.ts` redirect as
