@@ -91,9 +91,10 @@ STATE=""
 while (( SECONDS < deadline )); do
   STATE=$(api GET "${SITE_PATH}/nodejs/builds/${BUILD_UUID}" | jget '.state')
   LOGS=$(api GET "${SITE_PATH}/nodejs/builds/${BUILD_UUID}/logs?from_line=${LOG_LINE}" || echo '{}')
-  echo "$LOGS" | jq -r '(.data // .) | (.content // .logs // empty) | if type=="array" then .[] else . end' 2>/dev/null || true
+  echo "$LOGS" | jq -r '(.data // .) | (.logs // .content // empty) | if type=="array" then .[] else . end' 2>/dev/null || true
   NEW_LINE=$(echo "$LOGS" | jq -r '(.data // .) | .lines // empty' 2>/dev/null || true)
-  [[ -n "$NEW_LINE" ]] && LOG_LINE="$NEW_LINE"
+  # `lines` is how many lines this call returned, so accumulate it.
+  [[ "$NEW_LINE" =~ ^[0-9]+$ ]] && LOG_LINE=$((LOG_LINE + NEW_LINE))
   echo "state: ${STATE:-unknown}"
   case "$STATE" in
     completed) break ;;
