@@ -1,0 +1,60 @@
+# Lighthouse (mobile) against production (spec Phase 4: >= 90 on home and game pages).
+# Run by hand after a deploy. Reports are uploaded as an artifact.
+name: Lighthouse
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_performance:
+        description: "Fail below this mobile performance score"
+        required: false
+        default: "90"
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Mobile audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      MIN_PERF: ${{ inputs.min_performance }}
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Pick pages
+        run: |
+          game=$(curl -fsS "$SITE_URL/sitemap.xml" | grep -o "$SITE_URL/en/game/[^<]*" | head -1)
+          echo "PAGES=$SITE_URL/en $SITE_URL/fr/record $game" >> "$GITHUB_ENV"
+      - name: Audit
+        run: |
+          npm install -g lighthouse@12.8.2
+          mkdir -p reports
+          status=0
+          for url in $PAGES; do
+            # Warm the page cache first: a page renders once, then it's served from cache.
+            curl -fsS -o /dev/null "$url"
+            name=$(echo "$url" | sed 's|https\?://[^/]*/||; s|/|_|g')
+            lighthouse "$url" --quiet --chrome-flags="--headless=new --no-sandbox" \
+              --only-categories=performance,accessibility,best-practices,seo \
+              --output=json --output=html --output-path="reports/$name"
+            node -e '
+              const r = require(process.argv[1]);
+              const s = Object.fromEntries(Object.values(r.categories).map((c) => [c.id, Math.round(c.score * 100)]));
+              const a = r.audits;
+              console.log(process.argv[2], JSON.stringify(s),
+                "LCP", a["largest-contentful-paint"].displayValue,
+                "TBT", a["total-blocking-time"].displayValue,
+                "CLS", a["cumulative-layout-shift"].displayValue);
+              if (s.performance < Number(process.argv[3])) process.exit(1);
+            ' "$PWD/reports/$name.report.json" "$url" "$MIN_PERF" || status=1
+          done
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse
+          path: reports
