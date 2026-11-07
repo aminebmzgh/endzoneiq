@@ -6,7 +6,7 @@ import { canViewProContent, getViewer, isSignedIn, type Viewer } from "@/lib/aut
 import { sameOrigin } from "@/lib/billing/routes";
 import { getDb } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
-import { pushConfigured } from "./queue";
+import { enqueue, processQueue, pushConfigured } from "./queue";
 
 /**
  * /api/alerts: the signed-in user's own alert preferences, followed teams and push
@@ -99,8 +99,43 @@ export function alertsHandlers(deps: Deps = defaults) {
   };
 }
 
+const TEST_PUSH: Record<string, { title: string; body: string }> = {
+  en: { title: "EndzoneIQ test notification", body: "Push notifications work on this device." },
+  fr: {
+    title: "Notification de test EndzoneIQ",
+    body: "Les notifications push fonctionnent sur cet appareil.",
+  },
+  es: {
+    title: "Notificación de prueba de EndzoneIQ",
+    body: "Las notificaciones push funcionan en este dispositivo.",
+  },
+};
+
 export function pushHandlers(deps: Deps = defaults) {
   return {
+    /** PUT /api/alerts/push: send a test notification to the viewer's own devices. */
+    PUT: async (req: Request) => {
+      if (!sameOrigin(req)) return json(403, { error: "cross-origin request" });
+      const viewer = await deps.viewer(req);
+      if (!isSignedIn(viewer)) return json(401, { error: "sign in first" });
+      if (!pushConfigured()) return json(503, { error: "push is not configured" });
+      const locale = (await req.json().catch(() => ({})))?.locale;
+      const copy = TEST_PUSH[locale] ?? TEST_PUSH.en!;
+      await enqueue([
+        {
+          userId: viewer.userId,
+          channel: "push",
+          // One test per user per minute at most.
+          dedupeKey: `test:${viewer.userId}:${Math.floor(Date.now() / 60_000)}`,
+          payload: {
+            ...copy,
+            url: `${serverEnv().NEXT_PUBLIC_SITE_URL}/${TEST_PUSH[locale] ? locale : "en"}/account`,
+          },
+        },
+      ]);
+      const result = await processQueue({ budgetMs: 10_000, limit: 50 });
+      return json(200, { ok: true, ...result });
+    },
     /** Register this device for push (an endpoint belongs to one user: the latest). */
     POST: async (req: Request) => {
       if (!sameOrigin(req)) return json(403, { error: "cross-origin request" });

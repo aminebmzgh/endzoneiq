@@ -253,7 +253,9 @@
     "weekly": "Weekly picks email (Tuesdays)",
     "teams": "Only these teams (none selected = every game)",
     "proOnly": "Pick-change alerts are part of Pro.",
-    "saveAlerts": "Save alerts"
+    "saveAlerts": "Save alerts",
+    "testPush": "Send a test notification",
+    "testSent": "Sent: check this device."
   },
   "Pricing": {
     "heading": "Pricing",

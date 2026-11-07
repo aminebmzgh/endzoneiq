@@ -253,7 +253,9 @@
     "weekly": "E-mail hebdomadaire des pronostics (le mardi)",
     "teams": "Seulement ces équipes (aucune = tous les matchs)",
     "proOnly": "Les alertes de changement de pronostic font partie de Pro.",
-    "saveAlerts": "Enregistrer les alertes"
+    "saveAlerts": "Enregistrer les alertes",
+    "testPush": "Envoyer une notification de test",
+    "testSent": "Envoyée : regardez cet appareil."
   },
   "Pricing": {
     "heading": "Tarifs",

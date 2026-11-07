@@ -106,9 +106,12 @@ async function AccountContent({
       <section className="rounded-lg border border-border bg-card p-5">
         <h2 className="mb-3 font-semibold">{t("alertsHeading")}</h2>
         <AlertsPanel
+          locale={locale}
           teams={sortedTeams.map((x) => ({ abbr: x.abbr, name: x.name }))}
           labels={{
             push: t("push"),
+            testPush: t("testPush"),
+            testSent: t("testSent"),
             pushOn: t("pushOn"),
             enablePush: t("enablePush"),
             disablePush: t("disablePush"),

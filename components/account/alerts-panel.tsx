@@ -14,6 +14,8 @@ type Alerts = {
 
 export type AlertsLabels = {
   push: string;
+  testPush: string;
+  testSent: string;
   pushOn: string;
   enablePush: string;
   disablePush: string;
@@ -54,9 +56,11 @@ async function send(url: string, method: string, body: unknown) {
 
 /** Alert preferences, followed teams and this device's push subscription. */
 export function AlertsPanel({
+  locale,
   teams,
   labels,
 }: {
+  locale: string;
   teams: { abbr: string; name: string }[];
   labels: AlertsLabels;
 }) {
@@ -65,6 +69,7 @@ export function AlertsPanel({
   const [pushState, setPushState] = useState<"idle" | "busy" | "denied" | "unsupported" | "error">(
     "idle",
   );
+  const [testState, setTestState] = useState<"idle" | "sent" | "error">("idle");
   const [saveState, setSaveState] = useState<"idle" | "busy" | "saved" | "error">("idle");
 
   const load = useCallback(async () => {
@@ -140,6 +145,19 @@ export function AlertsPanel({
             {subscribed ? (
               <>
                 <span className="text-sm text-accent">{labels.pushOn}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await send("/api/alerts/push", "PUT", { locale });
+                    setTestState(res.ok ? "sent" : "error");
+                  }}
+                  className="h-9 rounded-md border border-border px-3 text-sm hover:bg-muted"
+                >
+                  {labels.testPush}
+                </button>
+                {testState === "sent" && (
+                  <span className="text-sm text-accent">{labels.testSent}</span>
+                )}
                 <button
                   type="button"
                   onClick={disablePush}

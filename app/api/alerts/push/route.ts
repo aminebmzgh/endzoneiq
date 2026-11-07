@@ -12,3 +12,8 @@ export async function DELETE(req: Request) {
   await connection();
   return h.DELETE(req);
 }
+
+export async function PUT(req: Request) {
+  await connection();
+  return h.PUT(req);
+}
