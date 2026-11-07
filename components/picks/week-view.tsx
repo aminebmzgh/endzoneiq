@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@/components/locale-link";
 import { getWeekGames, getWeeks } from "@/lib/site/data";
 import { roundLabel, weekHref } from "@/lib/site/labels";
 import type { Locale } from "@/i18n/routing";

@@ -7,7 +7,7 @@ import { AfterKickoff } from "@/components/after-kickoff";
 import { LocalTime } from "@/components/local-time";
 import { OutcomeBadge, TeamSwatch, TierBadge, UpdatedBadge } from "@/components/picks/badges";
 import { ProbabilityBar } from "@/components/picks/probability-bar";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@/components/locale-link";
 import type { Locale } from "@/i18n/routing";
 import { getGame } from "@/lib/site/data";
 import { parseChangeReason, pct, roundLabel, weekHref } from "@/lib/site/labels";

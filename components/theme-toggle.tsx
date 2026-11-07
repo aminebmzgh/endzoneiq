@@ -1,18 +1,17 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 
-export function ThemeToggle() {
-  const t = useTranslations("Theme");
+/** `label` is translated on the server, so no message catalog ships to the browser. */
+export function ThemeToggle({ label }: { label: string }) {
   const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <button
       type="button"
-      aria-label={t("toggle")}
-      title={t("toggle")}
+      aria-label={label}
+      title={label}
       className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >

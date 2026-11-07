@@ -1,10 +1,14 @@
-import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { Link } from "@/components/locale-link";
+import type { Locale } from "@/i18n/routing";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
 
 export function SiteHeader() {
   const t = useTranslations("Nav");
+  const tl = useTranslations("Locale");
+  const tt = useTranslations("Theme");
+  const locale = useLocale() as Locale;
   const items = [
     { href: "/", label: t("thisWeek") },
     { href: "/record", label: t("record") },
@@ -17,8 +21,8 @@ export function SiteHeader() {
           Endzone<span className="text-accent">IQ</span>
         </Link>
         <div className="flex items-center gap-2">
-          <LocaleSwitcher />
-          <ThemeToggle />
+          <LocaleSwitcher label={tl("label")} locale={locale} />
+          <ThemeToggle label={tt("toggle")} />
         </div>
       </div>
       <nav aria-label={t("label")} className="mx-auto w-full max-w-5xl overflow-x-auto px-4">

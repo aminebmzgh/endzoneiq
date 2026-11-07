@@ -1,5 +1,5 @@
 import { useLocale, useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@/components/locale-link";
 import { AfterKickoff } from "@/components/after-kickoff";
 import { LocalTime } from "@/components/local-time";
 import { pct } from "@/lib/site/labels";

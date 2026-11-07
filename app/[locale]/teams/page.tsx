@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { TeamSwatch } from "@/components/picks/badges";
 import { TEAMS } from "@/db/seed/reference-data";
-import { Link } from "@/i18n/navigation";
+import { Link } from "@/components/locale-link";
 import type { Locale } from "@/i18n/routing";
 import { pageMetadata } from "@/lib/site/seo";
 

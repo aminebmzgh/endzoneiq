@@ -1,8 +1,7 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import type { Outcome, RecordRow } from "@/lib/site/types";
 
 const PAGE = 100;
@@ -10,11 +9,36 @@ type ResultFilter = "all" | Outcome | "pending";
 
 const selectClass = "h-9 rounded-md border border-border bg-background px-2 text-sm";
 
+/** Labels translated on the server (no message catalog in the browser). */
+export interface RecordTableLabels {
+  filterSeason: string;
+  filterTeam: string;
+  filterResult: string;
+  all: string;
+  /** Template with {shown} and {total}. */
+  showing: string;
+  noRows: string;
+  colWeek: string;
+  colGame: string;
+  colPick: string;
+  colProb: string;
+  colScore: string;
+  colResult: string;
+  outcome: Record<Outcome | "pending", string>;
+}
+
 /** Every published pick with its result, filterable (spec 11.3). */
-export function RecordTable({ rows }: { rows: RecordRow[] }) {
-  const t = useTranslations("Record");
-  const to = useTranslations("Outcome");
-  const locale = useLocale();
+export function RecordTable({
+  rows,
+  labels,
+  locale,
+}: {
+  rows: RecordRow[];
+  labels: RecordTableLabels;
+  locale: string;
+}) {
+  const t = (key: Exclude<keyof RecordTableLabels, "outcome">) => labels[key];
+  const to = (key: Outcome | "pending") => labels.outcome[key];
   const seasons = useMemo(() => [...new Set(rows.map((r) => r.season))], [rows]);
   const teams = useMemo(() => [...new Set(rows.flatMap((r) => [r.home, r.away]))].sort(), [rows]);
   const [season, setSeason] = useState<string>(seasons[0] ? String(seasons[0]) : "all");
@@ -77,7 +101,9 @@ export function RecordTable({ rows }: { rows: RecordRow[] }) {
       </div>
 
       <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
-        {t("showing", { shown: shown.length, total: filtered.length })}
+        {labels.showing
+          .replace("{shown}", String(shown.length))
+          .replace("{total}", String(filtered.length))}
       </p>
 
       {filtered.length === 0 ? (
@@ -114,7 +140,11 @@ export function RecordTable({ rows }: { rows: RecordRow[] }) {
                     {r.season} · {r.gameType === "REG" ? r.week : r.gameType}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <Link href={`/game/${r.slug}`} prefetch={false} className="hover:underline">
+                    <Link
+                      href={`/${locale}/game/${r.slug}`}
+                      prefetch={false}
+                      className="hover:underline"
+                    >
                       {r.away} @ {r.home}
                     </Link>
                   </td>

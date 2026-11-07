@@ -90,6 +90,7 @@ async function RecordContent({ locale }: { locale: Locale }) {
     getTranslations({ locale, namespace: "Record" }),
     getTranslations({ locale, namespace: "Tier" }),
   ]);
+  const to = await getTranslations({ locale, namespace: "Outcome" });
   const pctFmt = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1 });
   const p0 = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
   const dec = new Intl.NumberFormat(locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -277,7 +278,30 @@ async function RecordContent({ locale }: { locale: Locale }) {
         <h2 id="all-picks" className="mb-3 text-xl font-bold">
           {t("table")}
         </h2>
-        <RecordTable rows={rows} />
+        <RecordTable
+          rows={rows}
+          locale={locale}
+          labels={{
+            filterSeason: t("filterSeason"),
+            filterTeam: t("filterTeam"),
+            filterResult: t("filterResult"),
+            all: t("all"),
+            showing: t.raw("showing") as string,
+            noRows: t("noRows"),
+            colWeek: t("colWeek"),
+            colGame: t("colGame"),
+            colPick: t("colPick"),
+            colProb: t("colProb"),
+            colScore: t("colScore"),
+            colResult: t("colResult"),
+            outcome: {
+              win: to("win"),
+              loss: to("loss"),
+              tie: to("tie"),
+              pending: to("pending"),
+            },
+          }}
+        />
       </section>
     </div>
   );
