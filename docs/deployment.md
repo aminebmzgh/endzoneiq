@@ -18,6 +18,7 @@ push to main ─► CI (lint, types, vitest + MariaDB, ruff, pytest)
 3. [One-time GitHub setup](#3-one-time-github-setup)
 4. [Day-to-day deploys and rollback](#4-day-to-day-deploys-and-rollback)
 5. [Database migrations](#5-database-migrations)
+   - [5b. Data pipeline](#5b-data-pipeline-github-actions--internal-api)
 6. [Cron jobs (hPanel)](#6-cron-jobs-hpanel)
 7. [Fallback if Hostinger rejects the prebuilt package](#7-fallback-if-hostinger-rejects-the-prebuilt-package)
 8. [Upgrade path](#8-upgrade-path)
@@ -205,6 +206,31 @@ skip the upload.
    `INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('<sha256 of the .sql file>', <"when" from meta/_journal.json>);`
    (`sha256sum db/migrations/XXXX.sql` gives the hash.)
 4. Remove `SKIP_MIGRATIONS`.
+
+**Reference data** (teams, stadiums) is seeded by a migration
+(`0002_seed_teams_stadiums.sql`, rendered from `db/seed/reference-data.ts` with
+`npm run db:seed-sql`). To change it, edit the TS file, create a new custom migration
+(`npx drizzle-kit generate --custom --name=...`), point `SEED_MIGRATION` in
+`db/seed/render-sql.ts` at it and re-render. A test fails if the file and the data drift.
+
+**Append-only picks:** after migrating, `start.js` (re)installs two triggers on `picks`
+(`CREATE OR REPLACE TRIGGER`). If MariaDB refuses (binary logging can require SUPER), the
+app logs `[migrate] WARNING: could not install picks triggers` and starts anyway; the picks
+repository and the nightly integrity check still enforce append-only. `/api/health` shows
+which mode is live: `db.appendOnly` is `"triggers"` or `"app-layer"`.
+
+## 5b. Data pipeline (GitHub Actions → internal API)
+
+The pipeline never connects to MySQL. It posts to `/api/internal/*`, signed with
+`INGEST_SECRET` (the same value in hPanel env vars and in GitHub secrets). The contract is in
+[internal-api.md](internal-api.md).
+
+- `refresh_data.yml` runs daily (11:00 UTC) and syncs the current season.
+- **Full backfill (2012 → today):** Actions → _Refresh data_ → _Run workflow_ with
+  `from_season = 2012`. Takes about a minute. Re-running is safe: unchanged games are not
+  written again.
+- Every run compares a per-season digest from the site with one computed from nflverse and
+  fails on any mismatch. Each run is recorded in `pipeline_runs`, each API call in `ingest_log`.
 
 ## 6. Cron jobs (hPanel)
 

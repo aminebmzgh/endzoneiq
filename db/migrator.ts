@@ -10,6 +10,7 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import mysql from "mysql2/promise";
+import { type AppendOnlyMode, ensureAppendOnlyTriggers } from "./triggers";
 
 export const MIGRATION_LOCK = "endzoneiq_migrations";
 const LOCK_TIMEOUT_S = 90;
@@ -24,7 +25,7 @@ export async function runMigrations({
   databaseUrl,
   migrationsFolder,
   log = console.log,
-}: MigrateOptions): Promise<void> {
+}: MigrateOptions): Promise<{ appendOnly: AppendOnlyMode }> {
   const conn = await mysql.createConnection({
     uri: databaseUrl,
     timezone: "Z",
@@ -45,6 +46,7 @@ export async function runMigrations({
     try {
       await migrate(drizzle(conn), { migrationsFolder });
       log("[migrate] database is up to date");
+      return { appendOnly: await ensureAppendOnlyTriggers(conn, log) };
     } finally {
       await conn.query("SELECT RELEASE_LOCK(?)", [MIGRATION_LOCK]);
     }

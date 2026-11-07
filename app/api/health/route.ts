@@ -1,4 +1,5 @@
 import { connection, NextResponse } from "next/server";
+import { TRIGGER_STATUS_SQL } from "@/db/triggers";
 import { getPool } from "@/lib/db";
 import { buildHealthReport } from "@/lib/health";
 
@@ -7,9 +8,14 @@ export async function GET() {
 
   const report = await buildHealthReport(
     async () => {
-      const [rows] = await getPool().query("SELECT VERSION() AS version");
-      const version = (rows as Array<{ version: string }>)[0]?.version ?? "unknown";
-      return { version };
+      const pool = getPool();
+      const [[versionRows], [triggerRows]] = await Promise.all([
+        pool.query("SELECT VERSION() AS version"),
+        pool.query(TRIGGER_STATUS_SQL),
+      ]);
+      const version = (versionRows as Array<{ version: string }>)[0]?.version ?? "unknown";
+      const triggers = Number((triggerRows as Array<{ n: number }>)[0]?.n ?? 0);
+      return { version, appendOnly: triggers === 2 ? "triggers" : "app-layer" };
     },
     {
       sha: process.env.BUILD_SHA ?? "dev",

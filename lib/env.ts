@@ -9,6 +9,12 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
+  /** HMAC key shared with the GitHub Actions pipeline. Internal API answers 503 without it. */
+  INGEST_SECRET: z.string().min(32).optional(),
+  FEATURE_ODDS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -16,6 +22,17 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
 let cached: ServerEnv | undefined;
 
 export function serverEnv(): ServerEnv {
-  if (!cached) cached = serverEnvSchema.parse(process.env);
+  if (!cached) {
+    // Treat empty strings (as in .env.example) as unset.
+    const raw = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined && v !== ""),
+    );
+    cached = serverEnvSchema.parse(raw);
+  }
   return cached;
+}
+
+/** Tests only: forget the cached env after changing process.env. */
+export function resetServerEnvForTests(): void {
+  cached = undefined;
 }

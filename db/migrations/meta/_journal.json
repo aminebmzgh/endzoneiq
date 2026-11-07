@@ -8,6 +8,20 @@
       "when": 1794026021659,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1794049860721,
+      "tag": "0001_core_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794049933377,
+      "tag": "0002_seed_teams_stadiums",
+      "breakpoints": true
     }
   ]
 }

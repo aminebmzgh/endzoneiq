@@ -15,7 +15,7 @@ in `BACKLOG.md`, never into the code.
 | Phase             | Status                                                                        |
 | ----------------- | ----------------------------------------------------------------------------- |
 | 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions |
-| 1 Data foundation | Not started                                                                   |
+| 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
 | 2–8               | Not started                                                                   |
 
 ## Stack
@@ -34,17 +34,19 @@ in `BACKLOG.md`, never into the code.
 
 ```
 app/[locale]/        localized pages (root layout lives here; html lang = locale)
-app/api/             route handlers (/api/health; /api/internal/* from Phase 1)
+app/api/             route handlers (/api/health; /api/internal/* re-export lib/internal/handlers)
 components/          UI components
 i18n/                next-intl routing, request config, navigation helpers
 messages/            en.json, fr.json, es.json (keys must match; tested)
-lib/                 server code: env.ts (zod, server-only), db/, health.ts
-db/                  schema.ts, migrator.ts, migrations/ (generated SQL, committed)
+lib/                 server code: env.ts (zod, server-only), db/, health.ts, cache-tags.ts,
+                     internal/ (HMAC, rate limit, internalRoute wrapper, handlers), games/
+db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams, stadiums),
+                     migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
 scripts/             packaging, Hostinger deploy, smoke test, secret scan, local migrate
-pipeline/            Python package endzoneiq_pipeline + tests (uv project)
-docs/                deployment.md (more docs per phase)
-.github/workflows/   ci.yml, deploy.yml, rollback.yml
+pipeline/            Python package endzoneiq_pipeline (site_client, games, sources/, jobs/) + tests
+docs/                deployment.md, internal-api.md (more docs per phase)
+.github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml
 proxy.ts             next-intl locale detection/redirect (Next 16 renamed middleware → proxy)
 ```
 
@@ -58,12 +60,19 @@ npm run dev                   # http://localhost:3000 → /en
 
 npm run lint && npm run format:check && npm run typecheck && npm test
 npm run db:generate           # after editing db/schema.ts; commit db/migrations/*
+npm run db:seed-sql           # re-render the teams/stadiums seed migration (see docs/deployment.md §5)
 
 # Production package, same as CI:
 npm run build && npm run check:client-secrets && npm run build:migrator && npm run package
 
 cd pipeline && uv sync && uv run pytest && uv run ruff check . && uv run ruff format --check .
+
+# Ingest games into a running site (local: SITE_URL=http://localhost:3000 + INGEST_SECRET from .env.local)
+cd pipeline && uv run python -m endzoneiq_pipeline.jobs.refresh_games --from-season 2012
 ```
+
+Polars (via nflreadpy) needs AVX2, which this dev machine lacks. Locally run pipeline jobs that
+load nflverse data with `uv run --with polars-runtime-compat ...`. CI runners don't need it.
 
 `npm test` includes DB integration tests that skip themselves when no database is reachable.
 CI runs them against a MariaDB service container.
@@ -149,3 +158,25 @@ re-uploads a previous run's artifact.
   keep CI fast. Python is managed with uv (`uv.lock` committed).
 - **2026-11-07 Shadcn/ui:** design tokens use shadcn names; components are added with
   `npx shadcn add` as each phase needs them (none needed for the hello page).
+- **2026-11-07 Phase 1 scope:** data tables only (Section 9 minus user tables). Auth, profiles,
+  subscriptions, chat, alerts, push and notification_queue arrive with Phases 5–7, because the
+  auth library creates the `user` table they reference.
+- **2026-11-07 Games are keyed by the nflverse `game_id`** (e.g. `2024_01_BAL_KC`); team ids
+  1–32 are fixed by the seed (alphabetical). Legacy abbreviations OAK/SD/STL map to LV/LAC/LA,
+  in the pipeline adapter and again server-side. Stadium ids are nflverse `stadium_id`s, with
+  roof/surface/coordinates curated in `db/seed/reference-data.ts`.
+- **2026-11-07 Seeds are a custom migration** rendered from TS (`npm run db:seed-sql`), because
+  only the app itself can reach production MySQL. A test keeps file and data in sync.
+- **2026-11-07 Append-only picks:** triggers allow only `is_current` 1→0, generated from the
+  Drizzle column list and re-installed after every migration run. Installing them is
+  best-effort (binlog may require SUPER on Hostinger): `/api/health` reports
+  `db.appendOnly` = `triggers` | `app-layer`.
+- **2026-11-07 `updated_at` columns are TIMESTAMP ... ON UPDATE CURRENT_TIMESTAMP**
+  (Drizzle's DATETIME has no onUpdateNow), so they only move when a row really changes.
+- **2026-11-07 Internal API signing:** `v1=HMAC-SHA256(INGEST_SECRET, "ts.METHOD.path?query.body")`,
+  ±300 s window, shared test vector in both test suites. Ingest diffs incoming rows against
+  stored ones and writes only changes. A per-season **digest endpoint** lets the pipeline prove
+  that the DB matches nflverse exactly.
+- **2026-11-07 GET route handlers call `await connection()`** before reading the request, so
+  `cacheComponents` never prerenders them. Handlers live in `lib/internal/handlers.ts` so
+  tests can call them directly.

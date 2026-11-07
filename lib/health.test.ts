@@ -5,10 +5,17 @@ const build = { sha: "abc123", builtAt: "2026-11-07T00:00:00Z" };
 
 describe("buildHealthReport", () => {
   it("reports ok with the db version and the deployed sha", async () => {
-    const report = await buildHealthReport(async () => ({ version: "11.8.3-MariaDB" }), build);
+    const report = await buildHealthReport(
+      async () => ({ version: "11.8.3-MariaDB", appendOnly: "triggers" }),
+      build,
+    );
     expect(report.status).toBe("ok");
     expect(report.sha).toBe("abc123");
-    expect(report.db).toMatchObject({ ok: true, version: "11.8.3-MariaDB" });
+    expect(report.db).toMatchObject({
+      ok: true,
+      version: "11.8.3-MariaDB",
+      appendOnly: "triggers",
+    });
   });
 
   it("reports degraded when the db probe fails, without leaking credentials", async () => {

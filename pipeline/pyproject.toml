@@ -7,7 +7,9 @@ requires-python = ">=3.12,<3.13"
 # added in the phase that first uses them, to keep CI fast until then.
 dependencies = [
   "httpx>=0.28",
+  "nflreadpy>=0.1.5",
   "pydantic>=2.10",
+  "tzdata>=2026.6",
 ]
 
 [dependency-groups]

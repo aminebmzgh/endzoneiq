@@ -20,7 +20,8 @@
     "db:migrate": "tsx scripts/migrate-local.ts",
     "db:studio": "drizzle-kit studio",
     "build:migrator": "node scripts/build-migrator.mjs",
-    "package": "bash scripts/package-standalone.sh"
+    "package": "bash scripts/package-standalone.sh",
+    "db:seed-sql": "tsx scripts/gen-seed-migration.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

@@ -1,0 +1,57 @@
+# Daily data refresh (spec 12.1): schedules, results and status from nflverse,
+# posted to the site through the signed internal API, then verified season by
+# season against a digest of the source. Never touches MySQL directly.
+#
+# Backfill: Actions > Refresh data > Run workflow, from_season = 2012.
+name: Refresh data
+
+on:
+  schedule:
+    # 06:00 US Eastern = 11:00 UTC in winter (EST), 07:00 Eastern in summer (EDT).
+    # GitHub cron can start late; nothing depends on exact timing.
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      from_season:
+        description: "First season to sync (empty = current season only; 2012 = full backfill)"
+        required: false
+        default: ""
+      to_season:
+        description: "Last season (empty = current)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  games:
+    name: Schedules & results
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: pipeline
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - run: uv sync --locked --no-dev
+      - name: Ingest games and verify digests
+        env:
+          FROM_SEASON: ${{ inputs.from_season }}
+          TO_SEASON: ${{ inputs.to_season }}
+        run: |
+          args=()
+          [[ -n "$FROM_SEASON" ]] && args+=(--from-season "$FROM_SEASON")
+          [[ -n "$TO_SEASON" ]] && args+=(--to-season "$TO_SEASON")
+          uv run --no-dev python -m endzoneiq_pipeline.jobs.refresh_games "${args[@]}"

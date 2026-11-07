@@ -17,4 +17,8 @@ building them.
 
 ## Added during the build
 
-- _(none yet)_
+- Nonce store for the internal API, so a signed request can't be replayed even inside the
+  5-minute window (today every ingest endpoint is idempotent instead).
+- Shared rate-limit state if the site ever runs more than one Node process (the limiter is
+  in-memory per process).
+- Housekeeping: drop the unused Phase 0 `app_meta` table in a later migration.

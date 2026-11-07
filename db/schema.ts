@@ -1,15 +1,372 @@
-import { datetime, mysqlTable, varchar } from "drizzle-orm/mysql-core";
-import { sql } from "drizzle-orm";
-
 /**
- * Phase 0 placeholder schema: one key/value table so the migration pipeline
- * (drizzle-kit generate -> bundled SQL -> start.js migrator) is exercised end to end.
- * The full schema (Section 9) lands in Phase 1.
+ * EndzoneIQ database schema (spec Section 9), MariaDB 11.8 via Drizzle.
+ *
+ * Conventions: utf8mb4, every DATETIME is UTC (the pool sets timezone "Z"),
+ * JSON columns use `jsonText` (MariaDB stores JSON as LONGTEXT and returns strings).
+ * Migrations are backward-compatible: add first, remove later.
+ *
+ * User-facing tables (auth, profiles, subscriptions, chat, alerts, push,
+ * notification_queue) arrive with the phases that use them (5–7), because the
+ * auth library creates the `user` table they reference.
  */
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  char,
+  customType,
+  datetime,
+  double,
+  index,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  tinyint,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/mysql-core";
+
+/** JSON column that works on MariaDB, where JSON is LONGTEXT and comes back as a string. */
+export const jsonText = <T>(name: string) =>
+  customType<{ data: T; driverData: string }>({
+    dataType: () => "json",
+    toDriver: (value) => JSON.stringify(value),
+    fromDriver: (value) => (typeof value === "string" ? (JSON.parse(value) as T) : (value as T)),
+  })(name);
+
+const utcDatetime = (name: string) => datetime(name, { mode: "date" });
+const createdAt = () =>
+  utcDatetime("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`);
+/** TIMESTAMP so MariaDB maintains it (ON UPDATE): it only moves when a row really changes. */
+const updatedAt = () =>
+  timestamp("updated_at", { mode: "date" }).notNull().defaultNow().onUpdateNow();
+
+// ---------------------------------------------------------------------------
+// Phase 0 placeholder. Unused since Phase 1; dropped in a later migration
+// (add first, remove later).
 export const appMeta = mysqlTable("app_meta", {
   key: varchar("key", { length: 64 }).primaryKey(),
   value: varchar("value", { length: 255 }).notNull(),
-  updatedAt: datetime("updated_at", { mode: "date" })
+  updatedAt: utcDatetime("updated_at")
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });
+
+// ---------------------------------------------------------------------------
+// Reference data (seeded by migration 0002_seed_teams_stadiums)
+
+export const conferences = ["AFC", "NFC"] as const;
+export const divisions = ["East", "North", "South", "West"] as const;
+
+export const teams = mysqlTable("teams", {
+  /** Stable ids 1–32 assigned by the seed, alphabetical by abbreviation. */
+  id: smallint("id").primaryKey(),
+  /** Current franchise abbreviation (nflverse style: LA, LAC, LV, WAS...). */
+  abbr: varchar("abbr", { length: 3 }).notNull().unique(),
+  name: varchar("name", { length: 40 }).notNull(),
+  city: varchar("city", { length: 40 }).notNull(),
+  conference: mysqlEnum("conference", conferences).notNull(),
+  division: mysqlEnum("division", divisions).notNull(),
+  primaryColor: char("primary_color", { length: 7 }).notNull(),
+  secondaryColor: char("secondary_color", { length: 7 }).notNull(),
+});
+
+export const roofTypes = ["outdoors", "dome", "retractable"] as const;
+export const surfaces = ["grass", "turf"] as const;
+
+export const stadiums = mysqlTable("stadiums", {
+  /** nflverse stadium id, e.g. "KAN00", "LON02". */
+  id: varchar("id", { length: 8 }).primaryKey(),
+  name: varchar("name", { length: 80 }).notNull(),
+  /** Primary tenant; null for international/neutral venues. */
+  teamId: smallint("team_id").references(() => teams.id),
+  lat: double("lat").notNull(),
+  lon: double("lon").notNull(),
+  roofType: mysqlEnum("roof_type", roofTypes).notNull(),
+  surface: mysqlEnum("surface", surfaces).notNull(),
+  altitudeM: smallint("altitude_m").notNull(),
+  /** IANA timezone, used for travel/time-zone features and local kickoff display. */
+  timezone: varchar("timezone", { length: 40 }).notNull(),
+  /** False for venues no longer used as a team's home (Georgia Dome, Qualcomm...). */
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+// ---------------------------------------------------------------------------
+// Schedule
+
+export const seasonPhases = ["preseason", "regular", "postseason", "offseason"] as const;
+
+export const seasons = mysqlTable("seasons", {
+  year: smallint("year").primaryKey(),
+  currentWeek: tinyint("current_week").notNull(),
+  phase: mysqlEnum("phase", seasonPhases).notNull(),
+  updatedAt: updatedAt(),
+});
+
+export const gameTypes = ["REG", "WC", "DIV", "CON", "SB"] as const;
+export const gameStatuses = ["scheduled", "in_progress", "final", "postponed", "canceled"] as const;
+
+export const games = mysqlTable(
+  "games",
+  {
+    /** nflverse game_id, e.g. "2024_01_BAL_KC". The natural key for idempotent upserts. */
+    id: varchar("id", { length: 20 }).primaryKey(),
+    season: smallint("season").notNull(),
+    week: tinyint("week").notNull(),
+    gameType: mysqlEnum("game_type", gameTypes).notNull(),
+    homeTeamId: smallint("home_team_id")
+      .notNull()
+      .references(() => teams.id),
+    awayTeamId: smallint("away_team_id")
+      .notNull()
+      .references(() => teams.id),
+    stadiumId: varchar("stadium_id", { length: 8 }).references(() => stadiums.id),
+    neutralSite: boolean("neutral_site").notNull().default(false),
+    kickoffAt: utcDatetime("kickoff_at").notNull(),
+    status: mysqlEnum("status", gameStatuses).notNull().default("scheduled"),
+    homeScore: smallint("home_score"),
+    awayScore: smallint("away_score"),
+    overtime: boolean("overtime").notNull().default(false),
+    /** URL slug, e.g. "bal-at-kc-2024-week-1". */
+    slug: varchar("slug", { length: 64 }).notNull().unique(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("games_season_week_idx").on(t.season, t.week),
+    index("games_kickoff_idx").on(t.kickoffAt),
+    index("games_home_team_idx").on(t.homeTeamId, t.season),
+    index("games_away_team_idx").on(t.awayTeamId, t.season),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Players, injuries, weather, odds (ingest endpoints arrive in Phase 2/7)
+
+export const players = mysqlTable(
+  "players",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    gsisId: varchar("gsis_id", { length: 16 }).notNull().unique(),
+    name: varchar("name", { length: 80 }).notNull(),
+    position: varchar("position", { length: 8 }).notNull(),
+    teamId: smallint("team_id").references(() => teams.id),
+    /** Roster status from nflverse (ACT, RES, INA...). */
+    status: varchar("status", { length: 16 }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("players_team_idx").on(t.teamId)],
+);
+
+export const injuryStatuses = ["out", "doubtful", "questionable", "probable", "active"] as const;
+export const injurySources = ["nflverse", "admin"] as const;
+
+export const injuries = mysqlTable(
+  "injuries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    playerId: int("player_id")
+      .notNull()
+      .references(() => players.id),
+    gameId: varchar("game_id", { length: 20 })
+      .notNull()
+      .references(() => games.id),
+    reportStatus: mysqlEnum("report_status", injuryStatuses).notNull(),
+    source: mysqlEnum("source", injurySources).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("injuries_player_game_source_uq").on(t.playerId, t.gameId, t.source),
+    index("injuries_game_idx").on(t.gameId),
+  ],
+);
+
+export const weather = mysqlTable("weather", {
+  gameId: varchar("game_id", { length: 20 })
+    .primaryKey()
+    .references(() => games.id),
+  tempC: double("temp_c"),
+  windKph: double("wind_kph"),
+  precipMm: double("precip_mm"),
+  condition: varchar("condition", { length: 32 }),
+  fetchedAt: utcDatetime("fetched_at").notNull(),
+});
+
+export const odds = mysqlTable(
+  "odds",
+  {
+    gameId: varchar("game_id", { length: 20 })
+      .notNull()
+      .references(() => games.id),
+    source: varchar("source", { length: 32 }).notNull(),
+    spreadHome: double("spread_home"),
+    total: double("total"),
+    moneylineHome: int("moneyline_home"),
+    moneylineAway: int("moneyline_away"),
+    fetchedAt: utcDatetime("fetched_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.source] })],
+);
+
+/** Aggregated team stats only. Raw play-by-play never goes into MySQL. */
+export const teamWeekStats = mysqlTable(
+  "team_week_stats",
+  {
+    teamId: smallint("team_id")
+      .notNull()
+      .references(() => teams.id),
+    season: smallint("season").notNull(),
+    week: tinyint("week").notNull(),
+    elo: double("elo"),
+    offEpa: double("off_epa"),
+    defEpa: double("def_epa"),
+    offPassEpa: double("off_pass_epa"),
+    offRunEpa: double("off_run_epa"),
+    defPassEpa: double("def_pass_epa"),
+    defRunEpa: double("def_run_epa"),
+    offEpaRank: tinyint("off_epa_rank"),
+    defEpaRank: tinyint("def_epa_rank"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.season, t.week] }),
+    index("tws_season_week_idx").on(t.season, t.week),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Model and picks (filled from Phase 2/3)
+
+export const modelVersions = mysqlTable("model_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 64 }).notNull().unique(),
+  trainedAt: utcDatetime("trained_at").notNull(),
+  metricsJson: jsonText<Record<string, unknown>>("metrics_json").notNull(),
+  artifactUrl: varchar("artifact_url", { length: 512 }),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+export const confidenceTiers = ["lean", "solid", "strong"] as const;
+
+/**
+ * Append-only. A new prediction is a new row (version_no + 1) and the previous
+ * row's is_current flips 1 -> 0; nothing else may ever change, and rows are never
+ * deleted. Enforced by triggers (db/triggers.ts) where MariaDB allows them, and by
+ * the picks repository either way. content_hash = SHA-256(content + prev_hash)
+ * forms a public hash chain.
+ */
+export const picks = mysqlTable(
+  "picks",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    gameId: varchar("game_id", { length: 20 })
+      .notNull()
+      .references(() => games.id),
+    modelVersionId: int("model_version_id")
+      .notNull()
+      .references(() => modelVersions.id),
+    versionNo: smallint("version_no").notNull(),
+    publishedAt: utcDatetime("published_at").notNull(),
+    winnerTeamId: smallint("winner_team_id")
+      .notNull()
+      .references(() => teams.id),
+    winProb: double("win_prob").notNull(),
+    confidenceTier: mysqlEnum("confidence_tier", confidenceTiers).notNull(),
+    predSpread: double("pred_spread").notNull(),
+    predTotal: double("pred_total").notNull(),
+    featuresJson: jsonText<Record<string, unknown>>("features_json").notNull(),
+    shapJson: jsonText<Record<string, unknown>>("shap_json").notNull(),
+    changeReason: varchar("change_reason", { length: 255 }),
+    isCurrent: boolean("is_current").notNull(),
+    contentHash: char("content_hash", { length: 64 }).notNull().unique(),
+    prevHash: char("prev_hash", { length: 64 }),
+  },
+  (t) => [
+    uniqueIndex("picks_game_version_uq").on(t.gameId, t.versionNo),
+    index("picks_game_current_idx").on(t.gameId, t.isCurrent),
+    index("picks_published_idx").on(t.publishedAt),
+  ],
+);
+
+export const locales = ["en", "fr", "es"] as const;
+
+export const explanations = mysqlTable(
+  "explanations",
+  {
+    pickId: bigint("pick_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => picks.id),
+    locale: mysqlEnum("locale", locales).notNull(),
+    headline: varchar("headline", { length: 200 }).notNull(),
+    reasonsJson: jsonText<string[]>("reasons_json").notNull(),
+    matchupNotesJson: jsonText<string[]>("matchup_notes_json").notNull(),
+    generatedAt: utcDatetime("generated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pickId, t.locale] })],
+);
+
+export const totalResults = ["over", "under", "push"] as const;
+
+export const pickResults = mysqlTable("pick_results", {
+  pickId: bigint("pick_id", { mode: "number", unsigned: true })
+    .primaryKey()
+    .references(() => picks.id),
+  correctWinner: boolean("correct_winner").notNull(),
+  coveredSpread: boolean("covered_spread"),
+  totalResult: mysqlEnum("total_result", totalResults),
+  gradedAt: utcDatetime("graded_at").notNull(),
+});
+
+// ---------------------------------------------------------------------------
+// Operations
+
+export const pipelineRunStatuses = ["running", "success", "failure", "cancelled"] as const;
+
+export const pipelineRuns = mysqlTable(
+  "pipeline_runs",
+  {
+    /** Chosen by the pipeline: "<github run id>-<attempt>-<job>". */
+    id: varchar("id", { length: 96 }).primaryKey(),
+    job: varchar("job", { length: 64 }).notNull(),
+    startedAt: utcDatetime("started_at").notNull(),
+    finishedAt: utcDatetime("finished_at"),
+    status: mysqlEnum("status", pipelineRunStatuses).notNull(),
+    error: text("error"),
+    runUrl: varchar("run_url", { length: 255 }),
+  },
+  (t) => [index("pipeline_runs_job_started_idx").on(t.job, t.startedAt)],
+);
+
+export const ingestLog = mysqlTable(
+  "ingest_log",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    endpoint: varchar("endpoint", { length: 64 }).notNull(),
+    status: smallint("status").notNull(),
+    rows: int("rows").notNull().default(0),
+    durationMs: int("duration_ms").notNull(),
+    error: varchar("error", { length: 255 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ingest_log_created_idx").on(t.createdAt)],
+);
+
+export const auditLog = mysqlTable(
+  "audit_log",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    actor: varchar("actor", { length: 128 }).notNull(),
+    action: varchar("action", { length: 64 }).notNull(),
+    entity: varchar("entity", { length: 64 }).notNull(),
+    entityId: varchar("entity_id", { length: 64 }),
+    payload: jsonText<Record<string, unknown>>("payload"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_entity_idx").on(t.entity, t.entityId)],
+);

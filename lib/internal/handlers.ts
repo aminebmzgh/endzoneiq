@@ -1,0 +1,123 @@
+import "server-only";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
+import { z } from "zod";
+import { games, injuries, picks, pipelineRuns, players, seasons, teams } from "@/db/schema";
+import { tags } from "@/lib/cache-tags";
+import { getDb } from "@/lib/db";
+import { serverEnv } from "@/lib/env";
+import { gamesDigest } from "@/lib/games/digest";
+import { seasonDigestRows, upsertGames, upsertSeasons } from "@/lib/games/repository";
+import { InternalApiError, internalRoute } from "./route";
+import { ingestGamesBody, pipelineRunBody } from "./schemas";
+
+/**
+ * Handlers for /api/internal/*. Route files under app/api/internal only
+ * re-export these (GET routes call `connection()` first so they are never
+ * prerendered), which keeps them easy to test.
+ */
+
+/** POST /api/internal/ingest/games: upsert schedule, scores and status (idempotent). */
+export const ingestGames = internalRoute(
+  { endpoint: "ingest/games", schema: ingestGamesBody },
+  async ({ body }) => {
+    const result = await upsertGames(body.games);
+    const seasonsChanged = await upsertSeasons(body.seasons);
+
+    if (result.changedSeasons.length > 0) {
+      revalidateTag(tags.games, "max");
+      for (const year of result.changedSeasons) revalidateTag(tags.season(year), "max");
+    }
+    if (seasonsChanged > 0) revalidateTag(tags.seasons, "max");
+
+    return {
+      rows: result.inserted + result.updated + seasonsChanged,
+      data: { ...result, received: body.games.length, seasonsChanged },
+    };
+  },
+);
+
+/** GET /api/internal/games/digest?season=YYYY: proves the stored season matches the source. */
+export const gamesDigestHandler = internalRoute({ endpoint: "games/digest" }, async ({ url }) => {
+  const season = Number(url.searchParams.get("season"));
+  if (!Number.isInteger(season) || season < 1990 || season > 2100) {
+    throw new InternalApiError(400, "season query parameter is required");
+  }
+  const rows = await seasonDigestRows(season);
+  return { rows: 0, data: { season, ...gamesDigest(rows) } };
+});
+
+/** POST /api/internal/pipeline-run: report job start/end/status/error (idempotent upsert). */
+export const pipelineRun = internalRoute(
+  { endpoint: "pipeline-run", schema: pipelineRunBody },
+  async ({ body }: { body: z.infer<typeof pipelineRunBody> }) => {
+    const now = new Date();
+    const finished = body.status === "running" ? null : new Date(body.finishedAt ?? now);
+    await getDb()
+      .insert(pipelineRuns)
+      .values({
+        id: body.id,
+        job: body.job,
+        status: body.status,
+        startedAt: new Date(body.startedAt ?? now),
+        finishedAt: finished,
+        error: body.error ?? null,
+        runUrl: body.runUrl ?? null,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          status: sql`VALUES(${pipelineRuns.status})`,
+          finishedAt: sql`VALUES(${pipelineRuns.finishedAt})`,
+          error: sql`VALUES(${pipelineRuns.error})`,
+          runUrl: sql`COALESCE(VALUES(${pipelineRuns.runUrl}), ${pipelineRuns.runUrl})`,
+        },
+      });
+    // Failure alert emails (Resend) arrive in Phase 7.
+    return { rows: 1, data: { ok: true } };
+  },
+);
+
+/**
+ * GET /api/internal/export: the season state the pipeline needs. Admin injury
+ * overrides, current pick versions for upcoming games, feature flags.
+ */
+export const exportState = internalRoute({ endpoint: "export" }, async () => {
+  const db = getDb();
+  const now = new Date();
+  const [seasonRows, overrides, currentPicks] = await Promise.all([
+    db.select().from(seasons),
+    db
+      .select({
+        gameId: injuries.gameId,
+        gsisId: players.gsisId,
+        status: injuries.reportStatus,
+        updatedAt: injuries.updatedAt,
+      })
+      .from(injuries)
+      .innerJoin(players, eq(players.id, injuries.playerId))
+      .innerJoin(games, eq(games.id, injuries.gameId))
+      .where(and(eq(injuries.source, "admin"), gt(games.kickoffAt, now))),
+    db
+      .select({
+        gameId: picks.gameId,
+        versionNo: picks.versionNo,
+        winner: teams.abbr,
+        winProb: picks.winProb,
+        contentHash: picks.contentHash,
+      })
+      .from(picks)
+      .innerJoin(games, eq(games.id, picks.gameId))
+      .innerJoin(teams, eq(teams.id, picks.winnerTeamId))
+      .where(and(eq(picks.isCurrent, true), gt(games.kickoffAt, now))),
+  ]);
+  return {
+    rows: 0,
+    data: {
+      generatedAt: now.toISOString(),
+      featureFlags: { odds: serverEnv().FEATURE_ODDS },
+      seasons: seasonRows.map(({ year, currentWeek, phase }) => ({ year, currentWeek, phase })),
+      injuryOverrides: overrides,
+      currentPicks,
+    },
+  };
+});
