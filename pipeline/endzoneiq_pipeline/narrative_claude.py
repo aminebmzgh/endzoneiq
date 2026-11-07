@@ -48,7 +48,10 @@ play" or similar instead.
 Output fields:
 - headline: one sentence of at most 12 words that names the picked team.
 - reasons: exactly 3 sentences, each based on one of drivers_for_pick, most \
-important first. Aim for about 15 words; 20 words is a hard limit.
+important first. Aim for about 15 words; 20 words is a hard limit. If there are \
+fewer than 3 drivers_for_pick, base the remaining reasons on the win probability, \
+the projected margin or the confidence tier. Never turn a driver into a reason \
+against the pick.
 - matchup_notes: 1 to 3 short sentences (at most 40 words each) on what works \
 against the pick (drivers_against_pick, players_ruled_out) or what to watch.
 """

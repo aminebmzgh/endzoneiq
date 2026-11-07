@@ -143,6 +143,32 @@ def driver_evidence(
     return out
 
 
+def plausible(concept: str, evidence: dict[str, Any], helps_pick: bool) -> bool:
+    """False when a driver's direction contradicts its own evidence, e.g. the model
+    credits the pick for travelling farther. Such a reason can't be explained honestly
+    in plain words, so it is left out of the text (the stored SHAP is unchanged)."""
+
+    def favours_pick(v: float | None, lower_is_better: bool = False) -> bool | None:
+        if v is None or v == 0:
+            return None
+        return (v < 0) if lower_is_better else (v > 0)
+
+    if concept == "travel":
+        mine, theirs = evidence.get("pick_travel_km"), evidence.get("opponent_travel_km")
+        if mine is None or theirs is None:
+            return True
+        good = favours_pick(mine - theirs, lower_is_better=True)
+    elif concept == "injuries":
+        good = favours_pick(
+            evidence.get("injury_load_pick_minus_opponent_lower_is_better"), lower_is_better=True
+        )
+    elif concept == "rest":
+        good = favours_pick(evidence.get("rest_days_advantage"))
+    else:
+        return True
+    return good is None or good == helps_pick
+
+
 def build_facts(
     game: dict[str, Any],
     prediction: dict[str, Any],
@@ -161,16 +187,21 @@ def build_facts(
     def team(abbr: str) -> dict[str, str]:
         return {"abbr": abbr, "name": f"{teams[abbr]['city']} {teams[abbr]['name']}", "nickname": teams[abbr]["name"]}  # fmt: skip
 
-    def drivers(items: list[dict]) -> list[dict[str, Any]]:
-        return [
-            {
-                "concept": d["concept"],
-                "label": d["label"],
-                "strength": "major" if abs(d["impact"]) >= 0.15 else "minor",
-                "evidence": driver_evidence(features, list(d["features"]), pick_home),
-            }
-            for d in items
-        ]
+    def drivers(items: list[dict], helps_pick: bool) -> list[dict[str, Any]]:
+        out = []
+        for d in items:
+            evidence = driver_evidence(features, list(d["features"]), pick_home)
+            if not plausible(d["concept"], evidence, helps_pick):
+                continue
+            out.append(
+                {
+                    "concept": d["concept"],
+                    "label": d["label"],
+                    "strength": "major" if abs(d["impact"]) >= 0.15 else "minor",
+                    "evidence": evidence,
+                }
+            )
+        return out
 
     venue = reference.stadiums().get(game.get("stadium_id") or "", {})
     gt = game.get("game_type", "REG")
@@ -194,8 +225,8 @@ def build_facts(
             "projected_total_pts": round(prediction["pred_total"], 1),
             "note": "Model estimates, not certainties.",
         },
-        "drivers_for_pick": drivers(shap["for"]),
-        "drivers_against_pick": drivers(shap["against"]),
+        "drivers_for_pick": drivers(shap["for"], helps_pick=True),
+        "drivers_against_pick": drivers(shap["against"], helps_pick=False),
         "players_ruled_out": injuries or {},
     }
 

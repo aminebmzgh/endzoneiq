@@ -263,3 +263,16 @@ def test_claude_writer_sends_feedback(facts):
     ClaudeWriter(client, "m").write(facts, "en", None, ["numbers not in the facts: ['27']"])
     content = client.messages.kwargs["messages"][0]["content"]
     assert "previous answer was rejected" in content and "27" in content
+
+
+def test_implausible_drivers_are_left_out_of_the_facts():
+    # The model credits the away pick (BUF) for travelling 1,400 km: not explainable.
+    shap = {**SHAP_AWAY, "for": [*SHAP_AWAY["for"], SHAP_AWAY["against"][0]], "against": []}
+    facts = build_facts(GAME, PRED, shap, FEATURES, {})
+    assert "travel" not in [d["concept"] for d in facts["drivers_for_pick"]]
+    # Injuries count for BUF because KC carries the heavier load (lower is better).
+    assert "injuries" in [d["concept"] for d in facts["drivers_for_pick"]]
+    worse = build_facts(GAME, PRED, SHAP_AWAY, {**FEATURES, "injury_diff": -1.0}, {})
+    assert "injuries" not in [d["concept"] for d in worse["drivers_for_pick"]]
+    for locale in LOCALES:  # templates still produce 3 reasons
+        assert check(template_explanation(worse, locale), worse, locale) == []
