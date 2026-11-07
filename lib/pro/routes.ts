@@ -65,7 +65,14 @@ export function meHandler(deps: Pick<Deps, "viewer"> = defaults) {
     return json(
       200,
       v
-        ? { signedIn: true, plan: v.plan, admin: v.role === "admin", providers, billing }
+        ? {
+            signedIn: true,
+            // The access the viewer has: admins see everything Pro sees.
+            plan: canViewProContent(v) ? "pro" : "free",
+            admin: v.role === "admin",
+            providers,
+            billing,
+          }
         : { signedIn: false, providers, billing },
     );
   };

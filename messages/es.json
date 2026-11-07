@@ -209,7 +209,8 @@
     "none": "Ninguno",
     "save": "Guardar",
     "saved": "Guardado",
-    "error": "Algo salió mal. Inténtalo de nuevo."
+    "error": "Algo salió mal. Inténtalo de nuevo.",
+    "adminAccess": "Acceso Pro (admin)"
   },
   "Pricing": {
     "heading": "Precios",

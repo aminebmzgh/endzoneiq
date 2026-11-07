@@ -209,7 +209,8 @@
     "none": "Aucune",
     "save": "Enregistrer",
     "saved": "Enregistré",
-    "error": "Une erreur s'est produite. Veuillez réessayer."
+    "error": "Une erreur s'est produite. Veuillez réessayer.",
+    "adminAccess": "Accès Pro (admin)"
   },
   "Pricing": {
     "heading": "Tarifs",

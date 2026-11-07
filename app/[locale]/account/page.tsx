@@ -12,7 +12,7 @@ import { Link } from "@/components/locale-link";
 import { TEAMS } from "@/db/seed/reference-data";
 import type { Locale } from "@/i18n/routing";
 import { getAccount } from "@/lib/account";
-import { getViewer } from "@/lib/authz";
+import { getViewer, isAdmin } from "@/lib/authz";
 
 type Props = PageProps<"/[locale]/account">;
 
@@ -64,10 +64,12 @@ async function AccountContent({
 
       <section className="rounded-lg border border-border bg-card p-5">
         <h2 className="text-sm text-muted-foreground">{t("plan")}</h2>
-        <p className="mt-1 text-2xl font-bold">{account.plan === "pro" ? t("pro") : t("free")}</p>
+        <p className="mt-1 text-2xl font-bold">
+          {isAdmin(viewer) ? t("adminAccess") : account.plan === "pro" ? t("pro") : t("free")}
+        </p>
         {status && <p className="mt-1 text-sm text-muted-foreground">{status}</p>}
         <div className="mt-4 flex flex-wrap gap-3">
-          {account.plan === "free" && (
+          {account.plan === "free" && !isAdmin(viewer) && (
             <Link
               href="/pricing"
               prefetch={false}

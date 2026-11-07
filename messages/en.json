@@ -209,7 +209,8 @@
     "none": "None",
     "save": "Save",
     "saved": "Saved",
-    "error": "Something went wrong. Please try again."
+    "error": "Something went wrong. Please try again.",
+    "adminAccess": "Pro access (admin)"
   },
   "Pricing": {
     "heading": "Pricing",

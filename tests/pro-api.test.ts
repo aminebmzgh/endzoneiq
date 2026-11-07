@@ -70,6 +70,14 @@ describe("pro game API", () => {
 });
 
 describe("/api/me", () => {
+  it("reports Pro access for admins without a subscription", async () => {
+    const admin: Viewer = { userId: "a", email: "a@x.com", role: "admin", plan: "free" };
+    const res = await meHandler({ viewer: async () => admin })(
+      new Request("http://localhost/api/me"),
+    );
+    expect(await res.json()).toMatchObject({ signedIn: true, plan: "pro", admin: true });
+  });
+
   it("reports the plan and never the email", async () => {
     const res = await meHandler({ viewer: async () => viewers.pro })(
       new Request("http://localhost/api/me"),
