@@ -12,14 +12,14 @@ in `BACKLOG.md`, never into the code.
 
 ## Status
 
-| Phase             | Status                                                                        |
-| ----------------- | ----------------------------------------------------------------------------- |
-| 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions |
-| 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested  |
-| 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)        |
-| 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations     |
+| Phase             | Status                                                                          |
+| ----------------- | ------------------------------------------------------------------------------- |
+| 0 Setup           | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions   |
+| 1 Data foundation | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested    |
+| 2 Model v1        | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)          |
+| 3 Picks           | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
 | 4 Public web app  | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
-| 5–8               | Not started                                                                   |
+| 5–8               | Not started                                                                     |
 
 ## Stack
 
