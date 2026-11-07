@@ -207,7 +207,8 @@ BANNED = {
     "fr": r"\b(garanti(e|es|s)?|parier|paris? sportifs?|mise[sr]?)\b",
     "es": r"\b(garantiza(do|da|r)?|apuestas?|apostar|momios?|cuotas?)\b",
 }  # fmt: skip
-_NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)?")
+_GROUPED = re.compile(r"\d{1,3}(?:[,.   ]\d{3})+")
+_NUMBER = re.compile(r"(?<![\w.])(?:\d{1,3}(?:[,.   ]\d{3})+(?![\d,.])|\d+(?:[.,]\d+)?)")
 
 
 def _fact_numbers(obj: Any) -> list[float]:
@@ -224,7 +225,7 @@ def _fact_numbers(obj: Any) -> list[float]:
         for v in obj:
             nums.extend(_fact_numbers(v))
     elif isinstance(obj, str):
-        nums.extend(float(m.replace(",", ".")) for m in _NUMBER.findall(obj))
+        nums.extend(r for m in _NUMBER.findall(obj) for r in _readings(m))
     return nums
 
 
@@ -234,12 +235,34 @@ def ungrounded_numbers(texts: list[str], facts: dict[str, Any]) -> list[str]:
     bad = []
     for text in texts:
         for raw in _NUMBER.findall(text):
-            n = float(raw.replace(",", "."))
-            if n <= 3:  # "two reasons", "1st", "3 games": too small to be a made-up stat
-                continue
-            if not any(abs(n - v) <= 0.51 or (v and abs(n - v) / v <= 0.02) for v in allowed):
+            if not _grounded(raw, allowed) and not (
+                # "week 10 107 points" is two numbers, not 10 107
+                re.search(r"\s", raw) and all(_grounded(p, allowed) for p in raw.split())
+            ):
                 bad.append(raw)
     return bad
+
+
+def _grounded(raw: str, allowed: list[float]) -> bool:
+    readings = _readings(raw)
+    if all(n <= 3 for n in readings):  # "1st", "3 games": too small to be a made-up stat
+        return True
+    return any(_close(n, v) for n in readings for v in allowed)
+
+
+def _close(n: float, v: float) -> bool:
+    return abs(n - v) <= 0.51 or bool(v and abs(n - v) / v <= 0.02)
+
+
+def _readings(raw: str) -> list[float]:
+    """Possible values of a number as written: "6,943" is 6943 in English and 6.943 in
+    French; "6.943" the reverse; "6 943" (French grouping) is 6943."""
+    out = []
+    if _GROUPED.fullmatch(raw):
+        out.append(float(re.sub(r"[,.\s]", "", raw)))
+    if not re.search(r"\s", raw) and raw.count(",") + raw.count(".") <= 1:
+        out.append(float(raw.replace(",", ".")))
+    return out
 
 
 def check(expl: Explanation, facts: dict[str, Any], locale: Locale) -> list[str]:

@@ -16,6 +16,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from pydantic import ValidationError
+
 from endzoneiq_pipeline.narrative import (
     LOCALES,
     Explanation,
@@ -34,7 +36,9 @@ analysis site. It is not a betting site.
 Rules:
 - Use ONLY the facts in the JSON you are given. Do not add statistics, records, \
 quotes, news, injuries or player details that are not in the facts.
-- Only use numbers that appear in the facts (rounding is fine). Fewer numbers is better.
+- Every number you write must be copied from the facts (rounding is fine). Never \
+compute new numbers (no differences, sums, totals or percentages of your own) and \
+never use numbers from your own knowledge. Fewer numbers is better.
 - The win probability and projections are model estimates: never present them as \
 certain, never promise an outcome, no hype.
 - No betting talk: no odds, spreads, bets, locks or "value".
@@ -43,11 +47,19 @@ play" or similar instead.
 
 Output fields:
 - headline: one sentence of at most 12 words that names the picked team.
-- reasons: exactly 3 sentences, each at most 20 words, each based on one of \
-drivers_for_pick, most important first.
-- matchup_notes: 1 to 3 short sentences on what works against the pick \
-(drivers_against_pick, players_ruled_out) or what to watch.
+- reasons: exactly 3 sentences, each based on one of drivers_for_pick, most \
+important first. Aim for about 15 words; 20 words is a hard limit.
+- matchup_notes: 1 to 3 short sentences (at most 40 words each) on what works \
+against the pick (drivers_against_pick, players_ruled_out) or what to watch.
 """
+
+
+@dataclass
+class Rejected:
+    """An answer Claude gave that is not publishable, with the reasons."""
+
+    problems: list[str]
+
 
 LANGUAGE_INSTRUCTIONS: dict[Locale, str] = {
     "en": "Write in American English.",
@@ -66,13 +78,18 @@ LANGUAGE_INSTRUCTIONS: dict[Locale, str] = {
 
 class ExplanationWriter(Protocol):
     def write(
-        self, facts: dict[str, Any], locale: Locale, english: Explanation | None
-    ) -> Explanation | None: ...
+        self,
+        facts: dict[str, Any],
+        locale: Locale,
+        english: Explanation | None,
+        feedback: list[str] | None = None,
+    ) -> Explanation | Rejected | None: ...
 
 
 @dataclass
 class ClaudeWriter:
-    """One structured-output call per locale. Returns None on any failure."""
+    """One structured-output call per locale. Returns None when the API fails and
+    Rejected when the answer has the wrong shape."""
 
     client: Any  # anthropic.Anthropic
     model: str
@@ -80,8 +97,12 @@ class ClaudeWriter:
     max_tokens: int = 4000
 
     def write(
-        self, facts: dict[str, Any], locale: Locale, english: Explanation | None
-    ) -> Explanation | None:
+        self,
+        facts: dict[str, Any],
+        locale: Locale,
+        english: Explanation | None,
+        feedback: list[str] | None = None,
+    ) -> Explanation | Rejected | None:
         import anthropic
 
         parts = [LANGUAGE_INSTRUCTIONS[locale], "Facts:", json.dumps(facts, ensure_ascii=False)]
@@ -90,6 +111,12 @@ class ClaudeWriter:
                 "English version, for reference only. Write naturally in the target "
                 "language rather than translating word for word:",
                 json.dumps(english.model_dump(), ensure_ascii=False),
+            ]
+        if feedback:
+            parts += [
+                "Your previous answer was rejected for these reasons. Write a new answer "
+                "that fixes them:",
+                "\n".join(f"- {p}" for p in feedback),
             ]
         kwargs: dict[str, Any] = {
             "model": self.model,
@@ -118,9 +145,9 @@ class ClaudeWriter:
                 reasons=draft.reasons,
                 matchup_notes=draft.matchup_notes,
             )
-        except ValueError as err:
-            log.warning("Claude explanation failed validation for %s: %s", locale, err)
-            return None
+        except ValidationError as err:
+            problems = [str(e["msg"]).removeprefix("Value error, ") for e in err.errors()]
+            return Rejected(problems)
 
 
 def writer_from_env(env: dict[str, str] | None = None) -> ExplanationWriter | None:
@@ -144,23 +171,30 @@ class LocalizedExplanation:
 
 
 def explain_pick(
-    facts: dict[str, Any], writer: ExplanationWriter | None, attempts: int = 2
+    facts: dict[str, Any], writer: ExplanationWriter | None, attempts: int = 3
 ) -> dict[Locale, LocalizedExplanation]:
-    """All three locales. Each falls back to the template independently."""
+    """All three locales. A rejected answer is retried with the reasons it was
+    rejected; each locale falls back to the template independently."""
     out: dict[Locale, LocalizedExplanation] = {}
     english: Explanation | None = None
     for locale in LOCALES:
         result: Explanation | None = None
+        feedback: list[str] | None = None
         if writer is not None:
             for attempt in range(1, attempts + 1):
-                candidate = writer.write(facts, locale, english)
+                candidate = writer.write(facts, locale, english, feedback)
                 if candidate is None:
                     continue
-                problems = check(candidate, facts, locale)
+                problems = (
+                    candidate.problems
+                    if isinstance(candidate, Rejected)
+                    else check(candidate, facts, locale)
+                )
                 if not problems:
                     result = candidate
                     break
                 log.warning("%s explanation rejected (try %s): %s", locale, attempt, problems)
+                feedback = problems
         if result is None:
             out[locale] = LocalizedExplanation(template_explanation(facts, locale), "template")
         else:

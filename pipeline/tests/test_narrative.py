@@ -12,7 +12,12 @@ from endzoneiq_pipeline.narrative import (
     template_explanation,
     ungrounded_numbers,
 )
-from endzoneiq_pipeline.narrative_claude import ClaudeWriter, explain_pick, writer_from_env
+from endzoneiq_pipeline.narrative_claude import (
+    ClaudeWriter,
+    Rejected,
+    explain_pick,
+    writer_from_env,
+)
 
 GAME = {
     "game_id": "2026_10_BUF_KC",
@@ -141,13 +146,26 @@ def test_grounding_allows_rounded_fact_numbers(facts):
     assert ungrounded_numbers(["won by 27"], facts) == ["27"]
 
 
+@pytest.mark.parametrize(
+    "text", ["a 1,400 km trip", "un trajet de 1 400 km", "1.400 km", "1" + chr(0x202F) + "400 km"]
+)
+def test_grounding_reads_thousands_separators(facts, text):
+    assert ungrounded_numbers([text], facts) == []
+
+
+def test_grounding_still_catches_grouped_inventions(facts):
+    assert ungrounded_numbers(["a 6,943 km trip"], facts) == ["6,943"]
+    assert ungrounded_numbers(["Week 10, 64% chance"], facts) == []
+    assert ungrounded_numbers(["week 10 64 percent"], facts) == []  # two numbers
+
+
 class FakeWriter:
     def __init__(self, answers):
         self.answers = answers
         self.calls = []
 
-    def write(self, facts, locale, english):
-        self.calls.append((locale, english is not None))
+    def write(self, facts, locale, english, feedback=None):
+        self.calls.append((locale, english is not None, feedback))
         answer = self.answers.get(locale)
         return answer() if callable(answer) else answer
 
@@ -170,9 +188,21 @@ def test_explain_pick_falls_back_per_locale(facts):
     writer = FakeWriter({"en": en, "fr": fr_bad, "es": None})
     out = explain_pick(facts, writer)
     assert out["en"].source == "claude" and out["en"].explanation == en
-    assert out["fr"].source == "template"  # rejected twice, then template
+    assert out["fr"].source == "template"  # rejected three times, then template
     assert out["es"].source == "template"  # API failure
-    assert writer.calls.count(("fr", True)) == 2  # FR/ES get the English version as reference
+    fr_calls = [c for c in writer.calls if c[0] == "fr"]
+    assert len(fr_calls) == 3 and all(c[1] for c in fr_calls)  # English given as reference
+    # Retries carry the reasons the previous answer was rejected.
+    assert fr_calls[0][2] is None and "numbers" in fr_calls[1][2][0]
+
+
+def test_explain_pick_succeeds_after_feedback(facts):
+    good = template_explanation(facts, "en")
+    answers = iter([Rejected(["each reason must be 1-20 words"]), good])
+    writer = FakeWriter({"en": lambda: next(answers)})
+    out = explain_pick(facts, writer)
+    assert out["en"].source == "claude"
+    assert writer.calls[1] == ("en", False, ["each reason must be 1-20 words"])
 
 
 def test_explain_pick_without_writer_uses_templates(facts):
@@ -223,4 +253,13 @@ def test_claude_writer_rejects_refusals_and_bad_shapes(facts):
     assert ClaudeWriter(fake_client("refusal"), "m").write(facts, "en", None) is None
     assert ClaudeWriter(fake_client("max_tokens"), "m").write(facts, "en", None) is None
     two = SimpleNamespace(headline="h", reasons=["a", "b"], matchup_notes=["n"])
-    assert ClaudeWriter(fake_client(parsed=two), "m").write(facts, "en", None) is None
+    rejected = ClaudeWriter(fake_client(parsed=two), "m").write(facts, "en", None)
+    assert isinstance(rejected, Rejected) and "exactly 3" in rejected.problems[0]
+
+
+def test_claude_writer_sends_feedback(facts):
+    draft = SimpleNamespace(headline="Bills", reasons=["a.", "b.", "c."], matchup_notes=["d."])
+    client = fake_client(parsed=draft)
+    ClaudeWriter(client, "m").write(facts, "en", None, ["numbers not in the facts: ['27']"])
+    content = client.messages.kwargs["messages"][0]["content"]
+    assert "previous answer was rejected" in content and "27" in content
