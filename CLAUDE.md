@@ -180,6 +180,14 @@ re-uploads a previous run's artifact.
   (`ssh -p 65002 u701027769@31.170.166.52`; local alias `endzoneiq-ssh`). Check
   `ps -u $USER -o pid,lstart,args` and `readlink /proc/<pid>/cwd` if the live site doesn't
   match the deployed SHA.
+- **2026-11-07 Gotcha: changing hPanel/API env vars doesn't reach the running app.** Neither
+  saving the variables nor the "restart" API replaced the `next-server` processes. Re-run the
+  latest Deploy workflow (`gh run rerun <id>`), then check `/api/me` or the process environ
+  over SSH (names only).
+- **2026-11-07 Email:** endzoneiq.com is a verified sending domain in the Resend account
+  shared with mesvaleurs.ma (user-approved). EndzoneIQ uses its own send-only key
+  restricted to endzoneiq.com. The DNS records (`resend._domainkey`, `send` MX/TXT,
+  `rsend`) live in Hostinger DNS.
 - **2026-11-07 Build SHA** is baked in through `next.config.ts` `env.BUILD_SHA` (from
   `GITHUB_SHA`), so the smoke test can confirm exactly which commit is live.
 - **2026-11-07 `www` → apex:** handled at DNS/hPanel, with a `next.config.ts` redirect as
