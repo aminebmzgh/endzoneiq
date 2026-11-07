@@ -491,3 +491,47 @@ export const stripeEvents = mysqlTable("stripe_events", {
   type: varchar("type", { length: 64 }).notNull(),
   processedAt: createdAt(),
 });
+
+// ---------------------------------------------------------------------------
+// AI assistant (Phase 6). Threads belong to one user; only they can read them
+// (lib/authz.ts ownsResource). Questions per day are counted from chat_messages.
+
+export const chatThreads = mysqlTable(
+  "chat_threads",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 120 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("chat_threads_user_idx").on(t.userId, t.updatedAt)],
+);
+
+export const chatRoles = ["user", "assistant"] as const;
+
+export const chatMessages = mysqlTable(
+  "chat_messages",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    threadId: varchar("thread_id", { length: 36 })
+      .notNull()
+      .references(() => chatThreads.id, { onDelete: "cascade" }),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: mysqlEnum("role", chatRoles).notNull(),
+    content: text("content").notNull(),
+    /** Input + output tokens of the answer (assistant rows); 0 for questions. */
+    tokens: int("tokens").notNull().default(0),
+    createdAt: utcDatetime("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    index("chat_messages_thread_idx").on(t.threadId, t.id),
+    index("chat_messages_user_day_idx").on(t.userId, t.role, t.createdAt),
+  ],
+);

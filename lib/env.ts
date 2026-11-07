@@ -32,6 +32,13 @@ const serverEnvSchema = z.object({
         .filter(Boolean),
     ),
 
+  // --- AI assistant (Phase 6). Model names come from env, never hardcoded. ---
+  ANTHROPIC_API_KEY: z.string().optional(),
+  CLAUDE_MODEL_CHAT: z.string().optional(),
+  /** Questions per UTC day. */
+  CHAT_LIMIT_FREE: z.coerce.number().int().min(0).default(3),
+  CHAT_LIMIT_PRO: z.coerce.number().int().min(0).default(50),
+
   // --- Email (Resend). Without a key, magic links are logged in development only. ---
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("EndzoneIQ <hello@endzoneiq.com>"),

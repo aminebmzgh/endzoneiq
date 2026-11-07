@@ -20,7 +20,8 @@ in `BACKLOG.md`, never into the code.
 | 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations       |
 | 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below) |
 | 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)  |
-| 6–8                | Not started                                                                     |
+| 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES      |
+| 7–8                | Not started                                                                     |
 
 ## Stack
 
@@ -92,6 +93,9 @@ cd pipeline && uv run python -m endzoneiq_pipeline.jobs.backtest --out ../docs/b
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.train_model --out model-out
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.publish_week --season 2026 --week 8   --dry-run --model-dir model-out --out picks.json     # past week, nothing published
 cd pipeline && uv run python -m endzoneiq_pipeline.jobs.grade_picks --dry-run   # team snapshot only
+
+# Live assistant check: real Claude + the local dev DB (opt-in, costs a few cents)
+LIVE_CLAUDE=1 ANTHROPIC_API_KEY=... CLAUDE_MODEL_CHAT=... DATABASE_URL=<dev db> npx vitest run tests/chat.live.test.ts --reporter=verbose
 
 # Load test (spec Phase 4: ~50 concurrent users); exits 1 on errors or p95 > 2 s
 node scripts/load-test.mjs https://endzoneiq.com 50 30
@@ -320,3 +324,14 @@ re-uploads a previous run's artifact.
   reads `profiles.plan`. Until billing env vars exist, `/api/me` reports `billing: false`
   and the pricing page says Pro opens soon. Phase 5 acceptance (test-mode
   purchase/upgrade/cancel) is still open.
+- **2026-11-07 Assistant = manual streaming tool loop** (`lib/chat/assistant.ts`) on
+  `CLAUDE_MODEL_CHAT` (production: `claude-haiku-5-5`), not the beta tool runner. That
+  gives simple control of the 85 s deadline (AbortController): max 6 turns, 1500 tokens
+  per turn, cached system prompt.
+  - Its 7 tools (`lib/chat/tools.ts`) read the same cached data as the pages and apply
+    `lib/authz.ts`, so a free user's assistant can't reveal Pro reasons or projections.
+  - `/api/chat` streams NDJSON (`start`, `text`, `tool`, `done`).
+  - Signed-in users only. Quota: questions per UTC day counted in `chat_messages`
+    (`CHAT_LIMIT_FREE` 3, `CHAT_LIMIT_PRO` 50, admins 500). A failed answer gives the
+    question back.
+  - Threads are readable only by their owner; tokens are logged per answer.

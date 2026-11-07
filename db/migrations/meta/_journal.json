@@ -36,6 +36,13 @@
       "when": 1794071149197,
       "tag": "0004_auth_profiles_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1794074647700,
+      "tag": "0005_chat",
+      "breakpoints": true
     }
   ]
 }

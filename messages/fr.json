@@ -17,7 +17,9 @@
     "signInDescription": "Connectez-vous à EndzoneIQ avec un lien par e-mail ou avec Google.",
     "accountTitle": "Votre compte",
     "pricingTitle": "Tarifs : Gratuit et Pro",
-    "pricingDescription": "EndzoneIQ est gratuit : chaque pronostic, sa probabilité et sa raison principale, et tout le bilan. Pro ajoute toutes les analyses, les projections et les alertes."
+    "pricingDescription": "EndzoneIQ est gratuit : chaque pronostic, sa probabilité et sa raison principale, et tout le bilan. Pro ajoute toutes les analyses, les projections et les alertes.",
+    "chatTitle": "Assistant IA",
+    "chatDescription": "Posez vos questions sur un match, une équipe ou un pronostic NFL. Les réponses viennent des données du modèle EndzoneIQ."
   },
   "Home": {
     "tagline": "Chaque match NFL, expliqué en 60 secondes.",
@@ -47,7 +49,8 @@
     "teams": "Équipes",
     "signIn": "Connexion",
     "account": "Compte",
-    "pricing": "Tarifs"
+    "pricing": "Tarifs",
+    "chat": "Assistant"
   },
   "Week": {
     "regular": "Semaine {week}",
@@ -267,5 +270,37 @@
     "rivalry": "Rivalité de division",
     "playoffs": "Match de playoffs",
     "weather": "Météo"
+  },
+  "Chat": {
+    "heading": "Assistant IA",
+    "intro": "Posez vos questions sur les matchs de la semaine, une équipe, une blessure ou notre bilan. Les réponses utilisent les données d'EndzoneIQ.",
+    "signIn": "Connectez-vous pour utiliser l'assistant. C'est gratuit : 3 questions par jour.",
+    "signInButton": "Se connecter",
+    "placeholder": "Une question sur un match, une équipe ou un pronostic…",
+    "send": "Envoyer",
+    "stop": "Réflexion…",
+    "newChat": "Nouvelle discussion",
+    "history": "Discussions récentes",
+    "remaining": "{remaining} questions sur {limit} restantes aujourd'hui",
+    "limitFree": "Vous avez utilisé vos 3 questions gratuites du jour. Pro en offre beaucoup plus. Nouvelles questions demain.",
+    "limitPro": "Vous avez atteint la limite d'usage raisonnable du jour. Nouvelles questions demain.",
+    "notConfigured": "L'assistant n'est pas encore disponible.",
+    "error": "Une erreur s'est produite. Veuillez réessayer.",
+    "you": "Vous",
+    "assistant": "EndzoneIQ",
+    "disclaimer": "À des fins de divertissement et d'information. Ceci n'est pas un conseil de pari. L'assistant peut se tromper ; les pronostics sont des estimations du modèle.",
+    "examplesTitle": "Exemples",
+    "example1": "Pourquoi choisissez-vous les Chiefs cette semaine ?",
+    "example2": "Quels matchs sont les plus serrés cette semaine ?",
+    "example3": "Quel est le bilan de votre modèle cette saison ?",
+    "tools": {
+      "get_week_games": "Lecture des matchs de la semaine",
+      "get_game_detail": "Lecture du match",
+      "get_team_stats": "Lecture des stats de l'équipe",
+      "get_player_info": "Recherche du joueur",
+      "get_injuries": "Vérification des blessures",
+      "get_pick_history": "Lecture de l'historique du pronostic",
+      "get_track_record": "Lecture du bilan"
+    }
   }
 }

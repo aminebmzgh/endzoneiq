@@ -17,7 +17,9 @@
     "signInDescription": "Sign in to EndzoneIQ with a link by email or with Google.",
     "accountTitle": "Your account",
     "pricingTitle": "Pricing: Free and Pro",
-    "pricingDescription": "EndzoneIQ is free: every pick, its win probability and top reason, and the full track record. Pro adds every breakdown, projections and alerts."
+    "pricingDescription": "EndzoneIQ is free: every pick, its win probability and top reason, and the full track record. Pro adds every breakdown, projections and alerts.",
+    "chatTitle": "AI assistant",
+    "chatDescription": "Ask about any NFL game, team or pick. Answers come from EndzoneIQ's own model data."
   },
   "Home": {
     "tagline": "Every NFL game, explained in 60 seconds.",
@@ -47,7 +49,8 @@
     "teams": "Teams",
     "signIn": "Sign in",
     "account": "Account",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "chat": "Assistant"
   },
   "Week": {
     "regular": "Week {week}",
@@ -267,5 +270,37 @@
     "rivalry": "Division rivalry",
     "playoffs": "Playoff game",
     "weather": "Weather"
+  },
+  "Chat": {
+    "heading": "AI assistant",
+    "intro": "Ask about this week's games, a team, an injury or our track record. Answers use EndzoneIQ's own data.",
+    "signIn": "Sign in to use the assistant. It's free: 3 questions a day.",
+    "signInButton": "Sign in",
+    "placeholder": "Ask about a game, a team or a pick…",
+    "send": "Send",
+    "stop": "Thinking…",
+    "newChat": "New chat",
+    "history": "Recent chats",
+    "remaining": "{remaining} of {limit} questions left today",
+    "limitFree": "You've used today's 3 free questions. Pro gives you many more. New questions tomorrow.",
+    "limitPro": "You've reached today's fair-use limit. New questions tomorrow.",
+    "notConfigured": "The assistant isn't available yet.",
+    "error": "Something went wrong. Please try again.",
+    "you": "You",
+    "assistant": "EndzoneIQ",
+    "disclaimer": "For entertainment and information. Not betting advice. The assistant can make mistakes; picks are model estimates.",
+    "examplesTitle": "Try asking",
+    "example1": "Why do you like the Chiefs this week?",
+    "example2": "Which games are closest to a coin flip this week?",
+    "example3": "How has your model done this season?",
+    "tools": {
+      "get_week_games": "Reading this week's games",
+      "get_game_detail": "Reading the game",
+      "get_team_stats": "Reading team stats",
+      "get_player_info": "Looking up the player",
+      "get_injuries": "Checking injuries",
+      "get_pick_history": "Reading the pick history",
+      "get_track_record": "Reading the track record"
+    }
   }
 }

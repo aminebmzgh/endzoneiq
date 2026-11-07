@@ -14,6 +14,7 @@ export function SiteHeader() {
     { href: "/", label: t("thisWeek") },
     { href: "/record", label: t("record") },
     { href: "/teams", label: t("teams") },
+    { href: "/chat", label: t("chat") },
     { href: "/pricing", label: t("pricing") },
   ] as const;
   return (

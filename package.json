@@ -24,6 +24,7 @@
     "db:seed-sql": "tsx scripts/gen-seed-migration.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "better-auth": "1.7.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
