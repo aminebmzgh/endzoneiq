@@ -70,6 +70,8 @@ export function AlertsPanel({
     "idle",
   );
   const [testState, setTestState] = useState<"idle" | "sent" | "error">("idle");
+  /** The failing step and the browser's/server's own message, shown under the error. */
+  const [detail, setDetail] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "busy" | "saved" | "error">("idle");
 
   const load = useCallback(async () => {
@@ -93,26 +95,36 @@ export function AlertsPanel({
   async function enablePush(): Promise<boolean> {
     if (!data?.vapidPublicKey) return false;
     setPushState("busy");
+    setDetail(null);
+    let step = "permission";
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushState("denied");
         return false;
       }
+      step = "service worker";
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
+      step = "subscribe";
       const sub =
         (await reg.pushManager.getSubscription()) ??
         (await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: keyBytes(data.vapidPublicKey),
         }));
+      step = "save";
       const res = await send("/api/alerts/push", "POST", sub.toJSON());
-      if (!res.ok) throw new Error(String(res.status));
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(`HTTP ${res.status} ${body.error ?? ""}`.trim());
+      }
       setSubscribed(true);
       setPushState("idle");
       return true;
-    } catch {
+    } catch (err) {
+      const e = err as Error;
+      setDetail(`${step}: ${e?.name ?? "Error"}: ${e?.message ?? String(err)}`);
       setPushState("error");
       return false;
     }
@@ -123,6 +135,10 @@ export function AlertsPanel({
     setTestState("idle");
     if (!subscribed && !(await enablePush())) return;
     const res = await send("/api/alerts/push", "PUT", { locale });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setDetail(`test: HTTP ${res.status} ${body.error ?? ""}`.trim());
+    }
     setTestState(res.ok ? "sent" : "error");
   }
 
@@ -185,6 +201,9 @@ export function AlertsPanel({
             )}
             {testState === "sent" && <span className="text-sm text-accent">{labels.testSent}</span>}
             {testState === "error" && <span className="text-sm text-danger">{labels.error}</span>}
+            {detail && (
+              <p className="w-full font-mono text-xs break-all text-muted-foreground">{detail}</p>
+            )}
             {pushState === "denied" && (
               <span className="text-sm text-danger">{labels.pushDenied}</span>
             )}

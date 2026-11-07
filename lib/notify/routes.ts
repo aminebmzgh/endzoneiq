@@ -143,7 +143,13 @@ export function pushHandlers(deps: Deps = defaults) {
       if (!isSignedIn(viewer)) return json(401, { error: "sign in first" });
       if (!pushConfigured()) return json(503, { error: "push is not configured" });
       const parsed = subscribeBody.safeParse(await req.json().catch(() => null));
-      if (!parsed.success) return json(422, { error: "invalid subscription" });
+      if (!parsed.success) {
+        console.warn(
+          "[push] invalid subscription",
+          parsed.error.issues.map((i) => i.path.join(".") + ": " + i.message),
+        );
+        return json(422, { error: "invalid subscription" });
+      }
       await getDb()
         .insert(pushSubscriptions)
         .values({
