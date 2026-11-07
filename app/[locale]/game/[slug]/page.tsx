@@ -165,6 +165,7 @@ async function GameContent({ params }: { params: Props["params"] }) {
       />
       <Link
         href={weekHref(game.season, game.week)}
+        prefetch={false}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft aria-hidden className="size-4" />

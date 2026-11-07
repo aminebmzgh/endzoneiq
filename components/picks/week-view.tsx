@@ -44,6 +44,7 @@ export async function WeekView({
           {prev ? (
             <Link
               href={weekHref(season, prev.week)}
+              prefetch={false}
               className="rounded-md border border-border p-2 hover:bg-muted"
               aria-label={t("previous")}
             >
@@ -53,6 +54,7 @@ export async function WeekView({
           {next ? (
             <Link
               href={weekHref(season, next.week)}
+              prefetch={false}
               className="rounded-md border border-border p-2 hover:bg-muted"
               aria-label={t("next")}
             >

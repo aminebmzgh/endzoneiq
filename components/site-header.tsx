@@ -17,7 +17,7 @@ export function SiteHeader() {
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4">
-        <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
+        <Link href="/" prefetch={false} className="shrink-0 text-lg font-bold tracking-tight">
           Endzone<span className="text-accent">IQ</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -31,6 +31,7 @@ export function SiteHeader() {
             <li key={i.href}>
               <Link
                 href={i.href}
+                prefetch={false}
                 className="inline-block border-b-2 border-transparent py-2 text-muted-foreground hover:border-accent hover:text-foreground"
               >
                 {i.label}
