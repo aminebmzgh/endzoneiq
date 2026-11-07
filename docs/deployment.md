@@ -107,14 +107,27 @@ the Deploy workflow manually).
 hPanel → **Profile → API** (`https://hpanel.hostinger.com/profile/api`) → create a token.
 Store it **only** as the GitHub secret `HOSTINGER_API_TOKEN`.
 
+### 2.4b Where production secrets live
+
+The production values for `DATABASE_URL` (and its password), `INGEST_SECRET` and
+`CRON_SECRET` were generated on the developer machine into
+`C:\Users\Amine\.endzoneiq\production.env` (outside the repo, never committed). That file is
+the source of truth: the Hostinger "replace environment variables" API replaces the **whole**
+set and only returns masked values, so every update must resend all keys from that file.
+Back it up in a password manager.
+
 ### 2.5 `www` → apex redirect
 
-Only `endzoneiq.com` should serve the app.
+Only `endzoneiq.com` should be the canonical host.
 
-1. hPanel → **Domains → DNS**: make `www` a `CNAME` to `endzoneiq.com`.
-2. hPanel → the website → **Redirects**: 301 `https://www.endzoneiq.com/*` →
-   `https://endzoneiq.com/$1`, if hPanel offers it for Node.js apps.
-3. Backup: `next.config.ts` also 301s any request whose host is `www.endzoneiq.com`.
+Current DNS (set by Hostinger, leave as is): `@` is an `ALIAS` to
+`endzoneiq.com.cdn.hstgr.net.` and `www` is a `CNAME` to `www.endzoneiq.com.cdn.hstgr.net.`.
+Both go through Hostinger's CDN to the same single Node.js app (one process set, not two).
+Re-pointing `www` away from the CDN can break its SSL, so don't.
+
+The redirect is done in the app: `next.config.ts` 301s any request whose host is
+`www.endzoneiq.com` to `https://endzoneiq.com`. Optionally also add an hPanel redirect if
+offered for Node.js apps.
 
 ### 2.6 SSL
 
