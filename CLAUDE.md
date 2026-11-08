@@ -12,17 +12,17 @@ in `BACKLOG.md`, never into the code.
 
 ## Status
 
-| Phase              | Status                                                                            |
-| ------------------ | --------------------------------------------------------------------------------- |
-| 0 Setup            | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions     |
-| 1 Data foundation  | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested      |
-| 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)            |
-| 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations         |
-| 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below)   |
-| 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)    |
-| 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES        |
-| 7 Live and alerts  | ✅ Code done 2026-11-07. Watchers, admin overrides, re-predict, push/email alerts |
-| 8                  | Not started                                                                       |
+| Phase              | Status                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| 0 Setup            | ✅ Done 2026-11-07. Live at https://endzoneiq.com, deployed by GitHub Actions                |
+| 1 Data foundation  | ✅ Done 2026-11-07. Schema, seeds, signed internal API, 2012+ games ingested                 |
+| 2 Model v1         | ✅ Done 2026-11-07. Elo-anchored LightGBM beats Elo-only (backtest.md)                       |
+| 3 Picks            | ✅ Done 2026-11-07. Append-only hash-chained picks, EN/FR/ES explanations                    |
+| 4 Public web app   | ✅ 2026-11-07 (Lighthouse ≥ 90 not yet confirmed on stable hardware, see below)              |
+| 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)               |
+| 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES                   |
+| 7 Live and alerts  | ✅ Done 2026-11-08. Watchers, admin overrides, re-predict (~30 s), push verified on a device |
+| 8                  | Not started                                                                                  |
 
 ## Stack
 
@@ -369,3 +369,4 @@ re-uploads a previous run's artifact.
 - **2026-11-07 Admin is `/admin`, English only**, with its own root layout outside
   `[locale]`. Non-admins get a 404, and admin APIs answer 404 too. Every override and
   re-predict is written to `audit_log`.
+- **2026-11-08 Brave blocks web push by default** ('Registration failed - push service error'). The account page detects Brave and explains the setting (`brave://settings/privacy` → Use Google services for push messaging). Production push was verified on a real device with the test-notification button; the QB-out acceptance chain is covered by tests rather than a fake override on a live game (picks are permanent).
