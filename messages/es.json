@@ -255,7 +255,8 @@
     "proOnly": "Las alertas de cambio de pronóstico son parte de Pro.",
     "saveAlerts": "Guardar alertas",
     "testPush": "Enviar una notificación de prueba",
-    "testSent": "Enviada: mira este dispositivo."
+    "testSent": "Enviada: mira este dispositivo.",
+    "braveHint": "Brave bloquea las notificaciones push por defecto. Abre brave://settings/privacy, activa «Usar los servicios de Google para la mensajería push», reinicia Brave y vuelve a intentarlo."
   },
   "Pricing": {
     "heading": "Precios",

@@ -255,7 +255,8 @@
     "proOnly": "Pick-change alerts are part of Pro.",
     "saveAlerts": "Save alerts",
     "testPush": "Send a test notification",
-    "testSent": "Sent: check this device."
+    "testSent": "Sent: check this device.",
+    "braveHint": "Brave blocks web push by default. Open brave://settings/privacy, turn on “Use Google services for push messaging”, restart Brave, then try again."
   },
   "Pricing": {
     "heading": "Pricing",

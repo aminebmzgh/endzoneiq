@@ -110,6 +110,7 @@ async function AccountContent({
           teams={sortedTeams.map((x) => ({ abbr: x.abbr, name: x.name }))}
           labels={{
             push: t("push"),
+            braveHint: t("braveHint"),
             testPush: t("testPush"),
             testSent: t("testSent"),
             pushOn: t("pushOn"),

@@ -14,6 +14,7 @@ type Alerts = {
 
 export type AlertsLabels = {
   push: string;
+  braveHint: string;
   testPush: string;
   testSent: string;
   pushOn: string;
@@ -124,6 +125,13 @@ export function AlertsPanel({
       return true;
     } catch (err) {
       const e = err as Error;
+      // Brave ships with web push off: say how to turn it on instead of the raw error.
+      const nav = navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } };
+      if (step === "subscribe" && (await nav.brave?.isBrave?.().catch(() => false))) {
+        setDetail(labels.braveHint);
+        setPushState("error");
+        return false;
+      }
       setDetail(`${step}: ${e?.name ?? "Error"}: ${e?.message ?? String(err)}`);
       setPushState("error");
       return false;
