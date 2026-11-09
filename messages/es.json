@@ -27,12 +27,19 @@
     "principle1": "Un pronóstico y una probabilidad de victoria para cada partido",
     "principle2": "Tres razones, basadas solo en datos reales del modelo",
     "principle3": "Un historial público de cada pronóstico, aciertos y fallos incluidos",
-    "intro": "Un pronóstico, una probabilidad de victoria y tres razones claras para cada partido. Cada pronóstico se registra públicamente.",
-    "offseason": "La temporada terminó. Los pronósticos vuelven con el próximo calendario; el historial sigue disponible todo el año."
+    "intro": "Un pronóstico, una probabilidad de victoria y tres razones claras para cada partido. Cada pronóstico se registra públicamente."
   },
   "Footer": {
     "disclaimer": "EndzoneIQ es un servicio de análisis independiente y no está afiliado ni respaldado por la NFL ni por ningún equipo.",
-    "entertainment": "Con fines de entretenimiento e información. No es asesoramiento de apuestas."
+    "entertainment": "Con fines de entretenimiento e información. No es asesoramiento de apuestas.",
+    "links": "Información del sitio",
+    "about": "Sobre nosotros y metodología",
+    "terms": "Condiciones",
+    "privacy": "Privacidad",
+    "cookies": "Cookies",
+    "responsibleGaming": "Juego responsable",
+    "cookieSettings": "Configuración de cookies",
+    "data": "Datos: nflverse. Clima: Open-Meteo (CC BY 4.0)."
   },
   "Theme": {
     "toggle": "Cambiar tema de color"
@@ -256,7 +263,16 @@
     "saveAlerts": "Guardar alertas",
     "testPush": "Enviar una notificación de prueba",
     "testSent": "Enviada: mira este dispositivo.",
-    "braveHint": "Brave bloquea las notificaciones push por defecto. Abre brave://settings/privacy, activa «Usar los servicios de Google para la mensajería push», reinicia Brave y vuelve a intentarlo."
+    "braveHint": "Brave bloquea las notificaciones push por defecto. Abre brave://settings/privacy, activa «Usar los servicios de Google para la mensajería push», reinicia Brave y vuelve a intentarlo.",
+    "dataHeading": "Tus datos",
+    "dataBody": "Descarga una copia de todo lo que guardamos sobre tu cuenta, en un archivo JSON.",
+    "exportData": "Descargar mis datos",
+    "deleteHeading": "Eliminar cuenta",
+    "deleteBody": "Esto borra para siempre tu cuenta, tus preferencias, el historial del asistente y tus dispositivos push. Antes se cancela cualquier suscripción. No se puede deshacer.",
+    "deleteConfirm": "Escribe tu correo electrónico para confirmar",
+    "deleteButton": "Eliminar mi cuenta",
+    "deleteError": "No se pudo eliminar la cuenta. No se ha cambiado nada; inténtalo de nuevo o escríbenos.",
+    "privacyLink": "Política de privacidad"
   },
   "Pricing": {
     "heading": "Precios",
@@ -349,5 +365,37 @@
       "get_pick_history": "Leyendo el historial del pronóstico",
       "get_track_record": "Leyendo el historial"
     }
+  },
+  "NotFound": {
+    "metaTitle": "Página no encontrada",
+    "code": "404",
+    "title": "Esta página no está en el calendario.",
+    "body": "Puede que el enlace sea antiguo o que el partido haya cambiado. Prueba con una de estas:",
+    "home": "Pronósticos de la semana",
+    "record": "Historial",
+    "teams": "Los 32 equipos"
+  },
+  "Consent": {
+    "title": "Consentimiento de cookies",
+    "text": "Nos gustaría contar las visitas con una analítica respetuosa con la privacidad (PostHog, UE). Sin anuncios ni seguimiento entre sitios. Puedes cambiar de opinión cuando quieras.",
+    "accept": "Aceptar analítica",
+    "decline": "Rechazar",
+    "policy": "Política de cookies"
+  },
+  "Offseason": {
+    "title": "La temporada terminó. El historial se queda.",
+    "body": "Los pronósticos vuelven con el próximo calendario de la NFL. Mientras tanto, cada pronóstico de temporadas pasadas sigue siendo público, aciertos y fallos.",
+    "recordLabel": "Récord histórico",
+    "recordLink": "Ver todos los pronósticos",
+    "methodTitle": "Cómo funciona el modelo",
+    "methodBody": "Ratings Elo y un modelo que aprende de la eficiencia, los quarterbacks, las lesiones, el descanso, los viajes y el clima. Sin líneas de apuestas.",
+    "methodLink": "Sobre nosotros y metodología",
+    "modelCard": "Ficha del modelo (técnica)",
+    "notifyTitle": "Avísame al inicio de la temporada",
+    "notifyBody": "Recibe un correo cuando se publiquen los primeros pronósticos de la nueva temporada. Gratis, y puedes desactivarlo cuando quieras.",
+    "notifySignUp": "Crear una cuenta gratis",
+    "notifyButton": "Avísame",
+    "notifyDone": "Apuntado. Te escribiremos cuando salgan los primeros pronósticos.",
+    "notifyError": "No ha funcionado. Inténtalo de nuevo."
   }
 }

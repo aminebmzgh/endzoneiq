@@ -27,12 +27,19 @@
     "principle1": "Un pronostic et une probabilité de victoire pour chaque match",
     "principle2": "Trois raisons, tirées uniquement des vraies données du modèle",
     "principle3": "Un bilan public de chaque pronostic, victoires et défaites comprises",
-    "intro": "Un pronostic, une probabilité de victoire et trois raisons claires pour chaque match. Chaque pronostic est suivi publiquement.",
-    "offseason": "La saison est terminée. Les pronostics reviennent avec le prochain calendrier ; le bilan reste consultable toute l'année."
+    "intro": "Un pronostic, une probabilité de victoire et trois raisons claires pour chaque match. Chaque pronostic est suivi publiquement."
   },
   "Footer": {
     "disclaimer": "EndzoneIQ est un service d'analyse indépendant, non affilié à la NFL ni à aucune équipe, et non approuvé par elles.",
-    "entertainment": "À des fins de divertissement et d'information. Ceci n'est pas un conseil de pari."
+    "entertainment": "À des fins de divertissement et d'information. Ceci n'est pas un conseil de pari.",
+    "links": "Informations sur le site",
+    "about": "À propos et méthodologie",
+    "terms": "Conditions",
+    "privacy": "Confidentialité",
+    "cookies": "Cookies",
+    "responsibleGaming": "Jeu responsable",
+    "cookieSettings": "Paramètres des cookies",
+    "data": "Données : nflverse. Météo : Open-Meteo (CC BY 4.0)."
   },
   "Theme": {
     "toggle": "Changer le thème"
@@ -256,7 +263,16 @@
     "saveAlerts": "Enregistrer les alertes",
     "testPush": "Envoyer une notification de test",
     "testSent": "Envoyée : regardez cet appareil.",
-    "braveHint": "Brave bloque les notifications push par défaut. Ouvrez brave://settings/privacy, activez « Utiliser les services Google pour la messagerie push », redémarrez Brave puis réessayez."
+    "braveHint": "Brave bloque les notifications push par défaut. Ouvrez brave://settings/privacy, activez « Utiliser les services Google pour la messagerie push », redémarrez Brave puis réessayez.",
+    "dataHeading": "Vos données",
+    "dataBody": "Téléchargez une copie de tout ce qui est enregistré sur votre compte, au format JSON.",
+    "exportData": "Télécharger mes données",
+    "deleteHeading": "Supprimer le compte",
+    "deleteBody": "Cela efface définitivement votre compte, vos préférences, l'historique de l'assistant et vos appareils push. Un abonnement est d'abord résilié. C'est irréversible.",
+    "deleteConfirm": "Saisissez votre adresse e-mail pour confirmer",
+    "deleteButton": "Supprimer mon compte",
+    "deleteError": "Le compte n'a pas pu être supprimé. Rien n'a été modifié ; réessayez ou contactez-nous.",
+    "privacyLink": "Politique de confidentialité"
   },
   "Pricing": {
     "heading": "Tarifs",
@@ -349,5 +365,37 @@
       "get_pick_history": "Lecture de l'historique du pronostic",
       "get_track_record": "Lecture du bilan"
     }
+  },
+  "NotFound": {
+    "metaTitle": "Page introuvable",
+    "code": "404",
+    "title": "Cette page n'est pas au calendrier.",
+    "body": "Le lien est peut-être ancien, ou le match a été déplacé. Essayez plutôt :",
+    "home": "Les pronostics de la semaine",
+    "record": "Bilan",
+    "teams": "Les 32 équipes"
+  },
+  "Consent": {
+    "title": "Consentement aux cookies",
+    "text": "Nous aimerions compter les visites avec une mesure d'audience respectueuse de la vie privée (PostHog, UE). Pas de publicité, pas de suivi d'un site à l'autre. Vous pouvez changer d'avis à tout moment.",
+    "accept": "Accepter la mesure d'audience",
+    "decline": "Refuser",
+    "policy": "Politique de cookies"
+  },
+  "Offseason": {
+    "title": "La saison est terminée. Le bilan, lui, reste.",
+    "body": "Les pronostics reviennent avec le prochain calendrier NFL. D'ici là, chaque pronostic des saisons passées reste public, réussi ou raté.",
+    "recordLabel": "Bilan global",
+    "recordLink": "Voir tous les pronostics",
+    "methodTitle": "Comment fonctionne le modèle",
+    "methodBody": "Des notes Elo et un modèle qui apprend de l'efficacité, des quarterbacks, des blessures, du repos, des déplacements et de la météo. Sans cotes de paris.",
+    "methodLink": "À propos et méthodologie",
+    "modelCard": "Fiche du modèle (technique)",
+    "notifyTitle": "Prévenez-moi au coup d'envoi",
+    "notifyBody": "Recevez un e-mail quand les premiers pronostics de la nouvelle saison sont publiés. Gratuit, et désactivable à tout moment.",
+    "notifySignUp": "Créer un compte gratuit",
+    "notifyButton": "Me prévenir",
+    "notifyDone": "C'est noté. Nous vous écrirons dès la publication des premiers pronostics.",
+    "notifyError": "Cela n'a pas fonctionné. Veuillez réessayer."
   }
 }

@@ -9,6 +9,7 @@ import { deleteOldNotifications, processQueue, requeueStuck } from "@/lib/notify
 import { verifyChain } from "@/lib/picks/hash";
 import { loadChain } from "@/lib/picks/repository";
 import { getCurrentWeek } from "@/lib/site/data";
+import { captureError, reportError } from "@/lib/observability/sentry";
 
 /**
  * /api/internal/cron/* (spec 12.2), called by Hostinger cron jobs with
@@ -36,7 +37,7 @@ function cronRoute(name: string, job: () => Promise<unknown>) {
       const result = await job();
       return json(200, { job: name, ms: Date.now() - started, result });
     } catch (err) {
-      console.error(`[cron] ${name} failed`, err);
+      reportError(`[cron] ${name} failed`, err, { source: "cron", tags: { job: name } });
       return json(500, { job: name, error: "failed" });
     }
   };
@@ -84,6 +85,10 @@ export const cronIntegrityCheck = cronRoute("integrity-check", async () => {
   const verdict = verifyChain(await loadChain());
   if (!verdict.ok) {
     const day = new Date().toISOString().slice(0, 10);
+    await captureError(new Error("Hash chain verification failed"), {
+      source: "integrity-check",
+      extra: { verdict },
+    });
     await queueAdminEmail(
       `chain-broken:${day}`,
       "Hash chain verification FAILED",

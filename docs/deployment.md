@@ -21,6 +21,7 @@ push to main ─► CI (lint, types, vitest + MariaDB, ruff, pytest)
    - [5b. Data pipeline](#5b-data-pipeline-github-actions--internal-api)
    - [5c. Sign-in, email and payments](#5c-sign-in-email-and-payments-phase-5)
 6. [Cron jobs (hPanel)](#6-cron-jobs-hpanel)
+   - [6b. Errors and analytics](#6b-errors-and-analytics-phase-8)
 7. [Fallback if Hostinger rejects the prebuilt package](#7-fallback-if-hostinger-rejects-the-prebuilt-package)
 8. [Upgrade path](#8-upgrade-path)
 
@@ -319,6 +320,23 @@ saving variables doesn't restart the running processes):
 - `weather_watch.yml`: every 6 h.
 
 They publish only when the repository variable `PUBLISH_ENABLED=true`, like `publish_week.yml`.
+
+## 6b. Errors and analytics (Phase 8)
+
+Both are optional: without them nothing is sent anywhere and the cookie banner doesn't
+appear.
+
+- **Sentry:** create a project (platform "Node.js"; EU data region if available), copy its
+  DSN and add `SENTRY_DSN` to the Hostinger env vars (send the whole set from
+  `production.env`), then re-run the latest Deploy workflow. Browser errors are forwarded by
+  the server, so no `NEXT_PUBLIC_` DSN is needed. Set data retention to 90 days or less.
+- **PostHog:** create a project in the **EU** region, copy the project API key (`phc_...`)
+  and set it as the GitHub Actions **variable** `NEXT_PUBLIC_POSTHOG_KEY` (it is public and
+  baked in at build time). `NEXT_PUBLIC_POSTHOG_HOST` defaults to
+  `https://eu.i.posthog.com`. Push or run Deploy. In PostHog, turn off autocapture, session
+  replay and person profiles, and set retention to 12 months or less.
+
+Details and the event list: [runbook.md](runbook.md) §5.
 
 ## 7. Fallback if Hostinger rejects the prebuilt package
 

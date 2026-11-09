@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics/client";
 
 export type SignInLabels = {
   intro: string;
@@ -92,6 +93,8 @@ export function SignInForm({
     const target = safeNext(window.location.search, locale, fallbackPath);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read from the URL once
     setCallbackPath(target);
+    // ?mode=signup opens the sign-up form directly (offseason "Notify me at kickoff").
+    if (new URLSearchParams(window.location.search).get("mode") === "signup") setMode("signup");
     fetch("/api/me", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((m: { signedIn: boolean; providers: Providers }) => {
@@ -128,6 +131,7 @@ export function SignInForm({
           rememberMe: true,
         });
         if (res.ok) {
+          track("sign_in", { method: "password" });
           // Full load: the header and every cached page re-check who is signed in.
           window.location.replace(callbackPath);
           return;
@@ -144,8 +148,10 @@ export function SignInForm({
           name: email.split("@")[0]!.slice(0, 60),
           callbackURL: callbackPath,
         });
-        if (res.ok) setNotice(labels.signUpSent.replace("{email}", email));
-        else setError(res.status === 400 ? labels.tooShort : authError(res.status, labels));
+        if (res.ok) {
+          track("sign_up", { method: "password" });
+          setNotice(labels.signUpSent.replace("{email}", email));
+        } else setError(res.status === 400 ? labels.tooShort : authError(res.status, labels));
       } else if (mode === "forgot") {
         const res = await post("/request-password-reset", {
           email,

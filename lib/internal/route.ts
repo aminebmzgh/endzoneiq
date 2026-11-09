@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { createRateLimiter } from "./rate-limit";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, verifySignature } from "./signature";
+import { reportError } from "@/lib/observability/sentry";
 
 /**
  * Wraps an /api/internal/* route handler with the Section 8 rules:
@@ -136,7 +137,10 @@ export function internalRoute<S extends z.ZodType>(
         await writeLog(opts.endpoint, err.status, 0, started, err.message);
         return json(err.status, { error: err.message, details: err.details });
       }
-      console.error(`[internal] ${opts.endpoint} failed:`, err);
+      reportError(`[internal] ${opts.endpoint} failed:`, err, {
+        source: "internal-api",
+        tags: { endpoint: opts.endpoint },
+      });
       return reject(500, "internal error");
     }
   };

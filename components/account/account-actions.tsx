@@ -132,3 +132,57 @@ export function PreferencesForm({
     </form>
   );
 }
+
+/** Permanent deletion, confirmed by typing the account's email. */
+export function DeleteAccountForm({
+  locale,
+  email,
+  labels,
+}: {
+  locale: string;
+  email: string;
+  labels: { confirm: string; button: string; error: string };
+}) {
+  const [value, setValue] = useState("");
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const matches = value.trim().toLowerCase() === email.toLowerCase();
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!matches) return;
+        setState("busy");
+        const r = await postJson("/api/account", { confirm: value }, "DELETE");
+        if (r.ok) {
+          // Full reload: the session no longer exists.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(`/${locale}`);
+        } else setState("error");
+      }}
+    >
+      <label className="block text-sm">
+        {labels.confirm}
+        <input
+          type="email"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="mt-1 block h-10 w-full rounded-md border border-border bg-background px-2"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={!matches || state === "busy"}
+        className="h-10 rounded-md border border-danger px-4 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50"
+      >
+        {labels.button}
+      </button>
+      {state === "error" && (
+        <p role="alert" className="text-sm text-danger">
+          {labels.error}
+        </p>
+      )}
+    </form>
+  );
+}

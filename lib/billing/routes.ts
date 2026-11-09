@@ -7,6 +7,7 @@ import { serverEnv } from "@/lib/env";
 import { createCheckout, createPortal } from "./checkout";
 import { billingConfigured, stripe } from "./stripe";
 import { handleStripeEvent } from "./sync";
+import { reportError } from "@/lib/observability/sentry";
 
 /**
  * Billing route handlers, as factories so tests can inject the viewer and the Stripe
@@ -96,7 +97,10 @@ export function webhookHandler(deps: WebhookDeps = webhookDefaults) {
       return json(200, { received: true, result });
     } catch (err) {
       // 500 makes Stripe retry; the transaction rolled back, so the retry is clean.
-      console.error("[stripe] webhook failed", event.type, event.id, err);
+      reportError("[stripe] webhook failed", err, {
+        source: "stripe-webhook",
+        tags: { type: event.type, event: event.id },
+      });
       return json(500, { error: "processing failed" });
     }
   };

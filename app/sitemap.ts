@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { connection } from "next/server";
+import { DOC_PATHS } from "@/content/legal";
 import { TEAMS } from "@/db/seed/reference-data";
 import { routing } from "@/i18n/routing";
 import { getPublishedGames } from "@/lib/site/data";
@@ -28,6 +29,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...entry("/teams", { changeFrequency: "weekly", priority: 0.5 }),
     ...TEAMS.flatMap((t) =>
       entry(`/teams/${t.abbr.toLowerCase()}`, { changeFrequency: "weekly", priority: 0.5 }),
+    ),
+    ...Object.values(DOC_PATHS).flatMap((path) =>
+      entry(path, { changeFrequency: "monthly", priority: path === "/about" ? 0.5 : 0.2 }),
     ),
     ...games.flatMap((g) =>
       entry(`/game/${g.slug}`, {

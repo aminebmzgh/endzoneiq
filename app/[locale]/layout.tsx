@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LocalTimes } from "@/components/local-times";
+import { ConsentBanner, Telemetry } from "@/components/telemetry";
 import "../globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -41,6 +42,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const tc = await getTranslations({ locale, namespace: "Consent" });
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -54,6 +56,17 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           <main className="flex-1">{children}</main>
           <SiteFooter />
           <LocalTimes />
+          <Telemetry />
+          <ConsentBanner
+            policyHref={`/${locale}/cookies`}
+            labels={{
+              title: tc("title"),
+              text: tc("text"),
+              accept: tc("accept"),
+              decline: tc("decline"),
+              policy: tc("policy"),
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

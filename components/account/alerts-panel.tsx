@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { track } from "@/lib/analytics/client";
 
 type Alerts = {
   pro: boolean;
@@ -122,6 +123,7 @@ export function AlertsPanel({
       }
       setSubscribed(true);
       setPushState("idle");
+      track("push_enabled");
       return true;
     } catch (err) {
       const e = err as Error;

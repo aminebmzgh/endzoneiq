@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Locale } from "@/i18n/routing";
 import { runTool, TOOL_SCHEMAS, type ToolContext } from "./tools";
+import { reportError } from "@/lib/observability/sentry";
 
 /**
  * The assistant's agentic loop (spec 10.2): stream Claude's answer, run the tools it
@@ -123,7 +124,7 @@ export async function runAssistant(opts: {
     if (abort.signal.aborted || err instanceof Anthropic.APIUserAbortError) {
       return { text, tokens, stopped: "deadline" };
     }
-    console.error("[chat] assistant failed", err);
+    reportError("[chat] assistant failed", err, { source: "chat" });
     return { text, tokens, stopped: "error" };
   } finally {
     clearTimeout(timer);

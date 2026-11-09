@@ -27,12 +27,19 @@
     "principle1": "A pick and a win probability for every game",
     "principle2": "Three reasons, built only from real model data",
     "principle3": "A public track record of every pick, wins and losses",
-    "intro": "A pick, a win probability and three plain-English reasons for every game. Every pick is tracked in public.",
-    "offseason": "The season is over. Picks return with the next schedule; the track record stays open all year."
+    "intro": "A pick, a win probability and three plain-English reasons for every game. Every pick is tracked in public."
   },
   "Footer": {
     "disclaimer": "EndzoneIQ is an independent analysis service and is not affiliated with or endorsed by the NFL or any team.",
-    "entertainment": "For entertainment and informational purposes. Not betting advice."
+    "entertainment": "For entertainment and informational purposes. Not betting advice.",
+    "links": "Site information",
+    "about": "About and methodology",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "cookies": "Cookies",
+    "responsibleGaming": "Responsible gaming",
+    "cookieSettings": "Cookie settings",
+    "data": "Data: nflverse. Weather: Open-Meteo (CC BY 4.0)."
   },
   "Theme": {
     "toggle": "Toggle color theme"
@@ -256,7 +263,16 @@
     "saveAlerts": "Save alerts",
     "testPush": "Send a test notification",
     "testSent": "Sent: check this device.",
-    "braveHint": "Brave blocks web push by default. Open brave://settings/privacy, turn on “Use Google services for push messaging”, restart Brave, then try again."
+    "braveHint": "Brave blocks web push by default. Open brave://settings/privacy, turn on “Use Google services for push messaging”, restart Brave, then try again.",
+    "dataHeading": "Your data",
+    "dataBody": "Download a copy of everything stored about your account, as a JSON file.",
+    "exportData": "Download my data",
+    "deleteHeading": "Delete account",
+    "deleteBody": "This permanently erases your account, preferences, assistant history and push devices. A subscription is cancelled first. It can't be undone.",
+    "deleteConfirm": "Type your email address to confirm",
+    "deleteButton": "Delete my account",
+    "deleteError": "The account could not be deleted. Nothing was changed; please try again or contact us.",
+    "privacyLink": "Privacy policy"
   },
   "Pricing": {
     "heading": "Pricing",
@@ -349,5 +365,37 @@
       "get_pick_history": "Reading the pick history",
       "get_track_record": "Reading the track record"
     }
+  },
+  "NotFound": {
+    "metaTitle": "Page not found",
+    "code": "404",
+    "title": "This page isn't on the schedule.",
+    "body": "The link may be old, or the game may have moved. Try one of these instead:",
+    "home": "This week's picks",
+    "record": "Track record",
+    "teams": "All 32 teams"
+  },
+  "Consent": {
+    "title": "Cookie consent",
+    "text": "We'd like to count visits with privacy-friendly analytics (PostHog, EU). No ads, no tracking across sites. You can change your mind at any time.",
+    "accept": "Accept analytics",
+    "decline": "Decline",
+    "policy": "Cookie policy"
+  },
+  "Offseason": {
+    "title": "The season is over. The record isn't going anywhere.",
+    "body": "Picks return with the next NFL schedule. Until then, every pick from past seasons stays public, wins and losses alike.",
+    "recordLabel": "All-time record",
+    "recordLink": "See every pick",
+    "methodTitle": "How the model works",
+    "methodBody": "Elo ratings plus a model that learns from efficiency, quarterbacks, injuries, rest, travel and weather. No betting lines.",
+    "methodLink": "About and methodology",
+    "modelCard": "Model card (technical)",
+    "notifyTitle": "Notify me at kickoff",
+    "notifyBody": "Get one email when the first picks of the new season are published. Free, and you can turn it off at any time.",
+    "notifySignUp": "Create a free account",
+    "notifyButton": "Notify me",
+    "notifyDone": "You're on the list. We'll email you when the first picks are out.",
+    "notifyError": "That didn't work. Please try again."
   }
 }

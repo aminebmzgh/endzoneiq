@@ -22,7 +22,7 @@ in `BACKLOG.md`, never into the code.
 | 5 Accounts and Pro | ✅ Sign-in live 2026-11-07. Payments deferred: provider may change (see below)               |
 | 6 AI assistant     | ✅ Done 2026-11-07. Streaming chat with tools on our data, quota, EN/FR/ES                   |
 | 7 Live and alerts  | ✅ Done 2026-11-08. Watchers, admin overrides, re-predict (~30 s), push verified on a device |
-| 8                  | Not started                                                                                  |
+| 8 Polish, launch   | 🟡 Code done 2026-11-09. Open launch items in docs/launch.md (operator, keys, rollback test) |
 
 ## Stack
 
@@ -41,7 +41,12 @@ in `BACKLOG.md`, never into the code.
 ```
 app/[locale]/        localized pages (root layout lives here; html lang = locale):
                      game/[slug], weeks/[season]/[week], teams, teams/[abbr], and
-                     ez-view/[view] (internal: home + record, reached via proxy.ts rewrite)
+                     ez-view/[view] (internal: home + record, reached via proxy.ts rewrite);
+                     about, terms, privacy, cookies, responsible-gaming (static, from
+                     content/legal); not-found.tsx, error.tsx
+app/global-not-found.tsx, app/global-error.tsx   trilingual 404 / root error page
+content/legal/       long-form pages per locale (en/fr/es.ts, same shape, tested)
+instrumentation.ts   onRequestError → Sentry
 app/sitemap.ts, app/robots.ts, app/[locale]/**/opengraph-image.tsx   SEO
 app/api/             route handlers (/api/health; /api/internal/* re-export lib/internal/handlers)
 components/          UI components (picks/: game card, badges, week view; views/: home,
@@ -55,7 +60,9 @@ lib/                 server code: env.ts (zod, server-only), db/, health.ts, cac
                      site/ (cached public reads `data.ts`, record stats, labels, SEO,
                      free-games), auth.ts (Better Auth), authz.ts (every permission rule),
                      billing/ (Stripe checkout, portal, webhook sync), pro/ (gated API),
-                     account.ts, email.ts (Resend)
+                     account.ts, account-data.ts (GDPR export/delete), email.ts (Resend),
+                     observability/ (Sentry envelope client, /api/client-error),
+                     analytics/client.ts (consent + PostHog capture, browser)
 db/                  schema.ts, migrator.ts, triggers.ts, seed/ (teams.json, stadiums.json),
                      migrations/ (generated SQL, committed)
 deploy/              start.js + package.json shipped in the deploy archive
@@ -63,7 +70,8 @@ scripts/             packaging, Hostinger deploy, smoke test, secret scan, local
 pipeline/            Python package endzoneiq_pipeline (site_client, games, sources/, jobs/,
                      model/: data, elo, features, train, backtest, explain;
                      narrative*.py: explanations) + tests
-docs/                deployment.md, internal-api.md, model-card.md, backtest.md (generated)
+docs/                deployment.md, runbook.md, launch.md, internal-api.md, model-card.md,
+                     backtest.md (generated)
 .github/workflows/   ci.yml, deploy.yml, rollback.yml, refresh_data.yml, retrain.yml, grade_picks.yml,
                      publish_week.yml, repredict.yml, injury_watch.yml, weather_watch.yml,
                      lighthouse.yml
@@ -370,3 +378,28 @@ re-uploads a previous run's artifact.
   `[locale]`. Non-admins get a 404, and admin APIs answer 404 too. Every override and
   re-predict is written to `audit_log`.
 - **2026-11-08 Brave blocks web push by default** ('Registration failed - push service error'). The account page detects Brave and explains the setting (`brave://settings/privacy` → Use Google services for push messaging). Production push was verified on a real device with the test-notification button; the QB-out acceptance chain is covered by tests rather than a fake override on a live game (picks are permanent).
+- **2026-11-09 Errors and analytics without SDKs.** `@sentry/nextjs` and `posthog-js` would
+  add OpenTelemetry, a build plugin and tens of KB of browser JS (TBT, archive size, one
+  small process). Instead:
+  - `lib/observability/sentry.ts` posts envelopes with `fetch` (3 s timeout, 30/min, the
+    same error once a minute). Sources: `instrumentation.ts` `onRequestError`,
+    `reportError()` next to every caught-and-logged error, and browser errors forwarded
+    through `/api/client-error`. The DSN is server-only (`SENTRY_DSN`).
+  - `lib/analytics/client.ts` sends anonymous PostHog events (EU host,
+    `$process_person_profile: false`, random `ez-aid`, no query strings) only after
+    consent. Without `NEXT_PUBLIC_POSTHOG_KEY` there is no banner and nothing is sent.
+- **2026-11-09 Legal pages are documents, not UI strings:** `content/legal/{en,fr,es}.ts`
+  (a small inline markup: links, bold, lists, `{placeholders}` from `lib/site/legal.ts`).
+  The operator identity is a placeholder until the user decides (docs/launch.md). Error
+  boundaries use `components/error-copy.ts` (client side, like `lib/notify/copy.ts`).
+- **2026-11-09 404s:** `experimental.globalNotFound` (two root layouts) gives unmatched URLs
+  a trilingual page with no rendering cost; `notFound()` inside a localized page renders
+  `app/[locale]/not-found.tsx` with the header and footer.
+- **2026-11-09 Offseason mode** = the latest season's phase is `offseason` (Super Bowl to
+  schedule release). "Notify me at kickoff" turns on the existing weekly email (sent the
+  first Tuesday a week has picks) and sends signed-out visitors to sign-up first, so an
+  address is always confirmed. No separate mailing list.
+- **2026-11-09 GDPR self-service:** `/account` exports a JSON of the user's data (no password
+  hash, tokens or push keys) and deletes the account after the email is typed in. Live
+  Stripe subscriptions are cancelled first (failure aborts); `user` cascades to every user
+  table; `audit_log` keeps only the user id.

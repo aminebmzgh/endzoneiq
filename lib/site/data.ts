@@ -147,6 +147,18 @@ export async function getCurrentWeek(): Promise<WeekRef | null> {
   return g ? { season: s.year, week: g.week, gameType: g.gameType } : null;
 }
 
+/** Phase of the latest season ("offseason" from the Super Bowl until the next schedule). */
+export async function getSeasonPhase(): Promise<(typeof seasons.$inferSelect)["phase"] | null> {
+  cacheLife("hours");
+  cacheTag(tags.seasons);
+  const [s] = await getDb()
+    .select({ phase: seasons.phase })
+    .from(seasons)
+    .orderBy(desc(seasons.year))
+    .limit(1);
+  return s?.phase ?? null;
+}
+
 /** Every week of a season, for the week selector. */
 export async function getWeeks(season: number): Promise<WeekRef[]> {
   cacheLife("hours");

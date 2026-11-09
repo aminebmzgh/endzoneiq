@@ -51,6 +51,10 @@ const serverEnvSchema = z.object({
     .regex(/^[\w.-]+\/[\w.-]+$/)
     .default("aminebmzgh/endzoneiq"),
 
+  // --- Errors (Phase 8). lib/observability/sentry.ts reads it from process.env directly,
+  // so errors are still reported when this schema fails to parse. ---
+  SENTRY_DSN: z.string().url().optional(),
+
   // --- Email (Resend). Without a key, magic links are logged in development only. ---
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("EndzoneIQ <hello@endzoneiq.com>"),

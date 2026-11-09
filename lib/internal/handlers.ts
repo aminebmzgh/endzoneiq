@@ -35,6 +35,7 @@ import {
   modelVersionBody,
   pipelineRunBody,
 } from "./schemas";
+import { reportError } from "@/lib/observability/sentry";
 
 /**
  * Handlers for /api/internal/*. Route files under app/api/internal only
@@ -51,7 +52,7 @@ async function notifySafely(queue: () => Promise<unknown>) {
     await queue();
     await processQueue({ budgetMs: 8_000, limit: 100 });
   } catch (err) {
-    console.error("[notify] failed (cron/notifications will retry)", err);
+    reportError("[notify] failed (cron/notifications will retry)", err, { source: "notify" });
   }
 }
 

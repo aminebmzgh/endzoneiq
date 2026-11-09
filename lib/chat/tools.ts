@@ -18,6 +18,7 @@ import {
 } from "@/lib/site/data";
 import { byTier, calibration, tally } from "@/lib/site/record";
 import type { GameSummary } from "@/lib/site/types";
+import { reportError } from "@/lib/observability/sentry";
 
 /**
  * The assistant's tools (spec 10.2). Every tool reads EndzoneIQ's own data and applies
@@ -339,7 +340,7 @@ export async function runTool(
     const result = await (t.run as (a: any, c: ToolContext) => Promise<unknown>)(parsed.data, ctx);
     return { content: JSON.stringify(result), isError: false };
   } catch (err) {
-    console.error(`[chat] tool ${name} failed`, err);
+    reportError(`[chat] tool ${name} failed`, err, { source: "chat-tool", tags: { tool: name } });
     return { content: "The data lookup failed. Tell the user to try again later.", isError: true };
   }
 }

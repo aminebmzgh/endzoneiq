@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics/client";
 
 type Me = { signedIn: boolean; plan?: "free" | "pro"; billing?: boolean };
 
@@ -66,6 +67,7 @@ export function CheckoutButtons({
     });
     const data = (await res.json().catch(() => ({}))) as { url?: string };
     if (res.ok && data.url) {
+      track("checkout_started", { plan });
       window.location.assign(data.url);
       return;
     }

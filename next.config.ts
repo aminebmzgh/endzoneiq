@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // Unmatched URLs get app/global-not-found.tsx: the app has two root layouts
+  // ([locale] and admin), so there is no single layout to build a 404 from.
+  experimental: { globalNotFound: true },
   // Baked into the server bundle so /api/health can report what is deployed.
   env: {
     BUILD_SHA: process.env.GITHUB_SHA ?? "dev",

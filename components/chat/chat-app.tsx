@@ -3,6 +3,7 @@
 import { Plus, Send } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics/client";
 
 export type ChatLabels = {
   signIn: string;
@@ -95,6 +96,7 @@ export function ChatApp({ locale, labels }: { locale: string; labels: ChatLabels
         else setError(labels.error);
         return;
       }
+      track("chat_question");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";

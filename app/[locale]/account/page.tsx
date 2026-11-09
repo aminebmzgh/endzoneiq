@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Suspense } from "react";
 import {
+  DeleteAccountForm,
   ManageBillingButton,
   PreferencesForm,
   SignOutButton,
@@ -131,6 +132,37 @@ async function AccountContent({
       </section>
 
       <SignOutButton locale={locale} label={t("signOut")} />
+
+      <section className="rounded-lg border border-border bg-card p-5">
+        <h2 className="mb-2 font-semibold">{t("dataHeading")}</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          {t("dataBody")}{" "}
+          <Link href="/privacy" prefetch={false} className="underline underline-offset-4">
+            {t("privacyLink")}
+          </Link>
+        </p>
+        <a
+          href="/api/account/export"
+          download
+          className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+        >
+          {t("exportData")}
+        </a>
+      </section>
+
+      <section className="rounded-lg border border-danger/40 bg-card p-5">
+        <h2 className="mb-2 font-semibold">{t("deleteHeading")}</h2>
+        <p className="mb-3 text-sm text-muted-foreground">{t("deleteBody")}</p>
+        <DeleteAccountForm
+          locale={locale}
+          email={viewer.email}
+          labels={{
+            confirm: t("deleteConfirm"),
+            button: t("deleteButton"),
+            error: t("deleteError"),
+          }}
+        />
+      </section>
     </div>
   );
 }
