@@ -19,9 +19,9 @@ missing.
       `INGEST_SECRET`, `ANTHROPIC_API_KEY`; variables `DEPLOY_ENABLED`, `PUBLISH_ENABLED`,
       `NEXT_PUBLIC_SITE_URL`, `SITE_URL`, `HOSTINGER_USERNAME`, `HOSTINGER_WEBSITE`,
       `CLAUDE_MODEL_FAST` (checked with `gh secret list` / `gh variable list`, 2026-11-09).
-- [ ] **A rollback has been tested once.** Not yet: run `rollback.yml` against the previous
-      green Deploy run, confirm `/api/health` shows the old SHA, then re-run the latest
-      Deploy. Record the run IDs here.
+- [x] **A rollback has been tested once** (2026-11-09). `rollback.yml` run 42546372630
+      restored Deploy run 42441481398: `/api/health` showed `822e187` and the Phase 8 pages
+      were gone. Re-running Deploy run 42546007586 brought `9de85af` back.
 - [x] **Runbook** in [runbook.md](runbook.md).
 - [ ] **Rotate the credentials that appeared in chat transcripts** during setup (Hostinger
       API token, the production env values sent on 2026-11-07).
