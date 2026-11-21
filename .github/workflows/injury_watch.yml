@@ -34,11 +34,11 @@ jobs:
       PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: pipeline/uv.lock
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: pipeline/.cache/nflverse
           key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}

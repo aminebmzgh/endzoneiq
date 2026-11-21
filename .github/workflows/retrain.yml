@@ -42,12 +42,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: pipeline/uv.lock
       # Aggregated play-by-play per season (a few MB). Completed seasons never change.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: pipeline/.cache/nflverse
           key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
@@ -86,7 +86,7 @@ jobs:
       - name: Backtest
         if: inputs.backtest
         run: uv run --no-dev python -m endzoneiq_pipeline.jobs.backtest --out backtest.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: inputs.backtest
         with:
           name: backtest-report

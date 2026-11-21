@@ -37,11 +37,11 @@ jobs:
       PIPELINE_CACHE_DIR: ${{ github.workspace }}/pipeline/.cache/nflverse
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: pipeline/uv.lock
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: pipeline/.cache/nflverse
           key: nflverse-agg-${{ hashFiles('pipeline/endzoneiq_pipeline/model/data.py') }}-${{ github.run_id }}
@@ -56,7 +56,7 @@ jobs:
           [[ -n "$GAME_ID" ]] && args+=(--games "$GAME_ID")
           [[ "$PUBLISH" == "true" ]] || { args+=(--dry-run); echo "PUBLISH_ENABLED is not true: dry run."; }
           uv run --no-dev python -m endzoneiq_pipeline.jobs.publish_week "${args[@]}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: picks

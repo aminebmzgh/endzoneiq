@@ -49,7 +49,7 @@ jobs:
       - run: npm run build:migrator
       - name: Package
         run: bash scripts/package-standalone.sh dist-deploy endzoneiq-deploy.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: deploy-package
           path: endzoneiq-deploy.tar.gz
@@ -68,7 +68,7 @@ jobs:
       url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           name: deploy-package
       - name: Upload and activate on Hostinger

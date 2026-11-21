@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download package from run ${{ inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: deploy-package
           run-id: ${{ inputs.run_id }}
