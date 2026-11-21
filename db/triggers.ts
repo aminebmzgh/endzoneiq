@@ -59,6 +59,18 @@ export async function ensureAppendOnlyTriggers(
   }
 }
 
-/** Which mode is active right now (used by /api/health). */
-export const TRIGGER_STATUS_SQL = `SELECT COUNT(*) AS n FROM information_schema.TRIGGERS
-  WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME IN ('${PICKS_UPDATE_TRIGGER}', '${PICKS_DELETE_TRIGGER}')`;
+/**
+ * Which mode is active right now (used by /api/health).
+ *
+ * `SHOW TRIGGERS LIKE '<table>'` reads only the picks table's triggers. The
+ * equivalent information_schema.TRIGGERS query took ~1.1 s on Hostinger's shared
+ * MariaDB, where `SELECT VERSION()` takes 1 ms.
+ */
+export async function appendOnlyMode(db: Pick<Connection, "query">): Promise<AppendOnlyMode> {
+  const { name } = getTableConfig(picks);
+  const [rows] = await db.query("SHOW TRIGGERS LIKE ?", [name]);
+  const names = new Set((rows as Array<{ Trigger: string }>).map((r) => r.Trigger));
+  return names.has(PICKS_UPDATE_TRIGGER) && names.has(PICKS_DELETE_TRIGGER)
+    ? "triggers"
+    : "app-layer";
+}

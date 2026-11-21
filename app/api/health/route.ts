@@ -1,5 +1,5 @@
 import { connection, NextResponse } from "next/server";
-import { TRIGGER_STATUS_SQL } from "@/db/triggers";
+import { appendOnlyMode } from "@/db/triggers";
 import { getPool } from "@/lib/db";
 import { buildHealthReport } from "@/lib/health";
 
@@ -9,20 +9,20 @@ export async function GET() {
   const report = await buildHealthReport(
     async () => {
       const pool = getPool();
-      const timed = async (sql: string) => {
+      const timed = async <T>(run: () => Promise<T>) => {
         const t0 = performance.now();
-        const [rows] = await pool.query(sql);
-        return { rows, ms: Math.round(performance.now() - t0) };
+        const value = await run();
+        return { value, ms: Math.round(performance.now() - t0) };
       };
       const [v, t] = await Promise.all([
-        timed("SELECT VERSION() AS version"),
-        timed(TRIGGER_STATUS_SQL),
+        timed(() => pool.query("SELECT VERSION() AS version")),
+        timed(() => appendOnlyMode(pool)),
       ]);
-      const version = (v.rows as Array<{ version: string }>)[0]?.version ?? "unknown";
-      const triggers = Number((t.rows as Array<{ n: number }>)[0]?.n ?? 0);
+      const [versionRows] = v.value;
+      const version = (versionRows as Array<{ version: string }>)[0]?.version ?? "unknown";
       return {
         version,
-        appendOnly: triggers === 2 ? "triggers" : "app-layer",
+        appendOnly: t.value,
         timings: { versionMs: v.ms, triggersMs: t.ms },
       };
     },

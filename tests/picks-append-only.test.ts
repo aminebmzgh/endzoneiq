@@ -7,7 +7,12 @@ import { getTableConfig } from "drizzle-orm/mysql-core";
 import { beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "@/db/migrator";
 import { picks } from "@/db/schema";
-import { APPEND_ONLY_MESSAGE, appendOnlyTriggerSql } from "@/db/triggers";
+import {
+  APPEND_ONLY_MESSAGE,
+  appendOnlyMode,
+  appendOnlyTriggerSql,
+  PICKS_DELETE_TRIGGER,
+} from "@/db/triggers";
 import { connect, dbReachable, testDbUrl } from "./helpers/db";
 
 let reachable = false;
@@ -31,6 +36,27 @@ describe("appendOnlyTriggerSql", () => {
       expect(update).toContain(`NEW.\`${col}\` <=> OLD.\`${col}\``);
     }
     expect(update).not.toContain("NEW.`is_current` <=> OLD.`is_current`");
+  });
+});
+
+describe("appendOnlyMode (integration)", () => {
+  it("reports triggers once both are installed, app-layer when one is missing", async (ctx) => {
+    if (!reachable) ctx.skip();
+    const c = await connect();
+    try {
+      expect(await appendOnlyMode(c)).toBe("triggers");
+      await c.query(`DROP TRIGGER \`${PICKS_DELETE_TRIGGER}\``);
+      expect(await appendOnlyMode(c)).toBe("app-layer");
+    } finally {
+      await c.query(appendOnlyTriggerSql()[1]);
+      await c.end();
+    }
+    const again = await connect();
+    try {
+      expect(await appendOnlyMode(again)).toBe("triggers");
+    } finally {
+      await again.end();
+    }
   });
 });
 
