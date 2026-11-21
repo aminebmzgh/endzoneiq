@@ -2,6 +2,8 @@ export interface DbProbeResult {
   version: string;
   /** How picks are kept append-only: DB triggers, or only the app layer. */
   appendOnly: "triggers" | "app-layer";
+  /** Per-query round trips (ms), to tell a slow database from a slow check. */
+  timings?: { versionMs: number; triggersMs: number };
 }
 export type DbProbe = () => Promise<DbProbeResult>;
 

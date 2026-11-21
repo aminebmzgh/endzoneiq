@@ -9,13 +9,22 @@ export async function GET() {
   const report = await buildHealthReport(
     async () => {
       const pool = getPool();
-      const [[versionRows], [triggerRows]] = await Promise.all([
-        pool.query("SELECT VERSION() AS version"),
-        pool.query(TRIGGER_STATUS_SQL),
+      const timed = async (sql: string) => {
+        const t0 = performance.now();
+        const [rows] = await pool.query(sql);
+        return { rows, ms: Math.round(performance.now() - t0) };
+      };
+      const [v, t] = await Promise.all([
+        timed("SELECT VERSION() AS version"),
+        timed(TRIGGER_STATUS_SQL),
       ]);
-      const version = (versionRows as Array<{ version: string }>)[0]?.version ?? "unknown";
-      const triggers = Number((triggerRows as Array<{ n: number }>)[0]?.n ?? 0);
-      return { version, appendOnly: triggers === 2 ? "triggers" : "app-layer" };
+      const version = (v.rows as Array<{ version: string }>)[0]?.version ?? "unknown";
+      const triggers = Number((t.rows as Array<{ n: number }>)[0]?.n ?? 0);
+      return {
+        version,
+        appendOnly: triggers === 2 ? "triggers" : "app-layer",
+        timings: { versionMs: v.ms, triggersMs: t.ms },
+      };
     },
     {
       sha: process.env.BUILD_SHA ?? "dev",
