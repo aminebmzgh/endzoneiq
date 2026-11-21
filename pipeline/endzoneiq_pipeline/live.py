@@ -7,6 +7,7 @@ overrides and stored forecasts to the model inputs before building features, so 
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -188,22 +189,35 @@ def outdoor_games_within(schedules: pd.DataFrame, now: datetime, hours: int = 72
 
 
 def fetch_forecast(
-    client: httpx.Client, lat: float, lon: float, kickoff: datetime
+    client: httpx.Client,
+    lat: float,
+    lon: float,
+    kickoff: datetime,
+    *,
+    retries: int = 3,
+    backoff_s: float = 2.0,
 ) -> dict[str, Any]:
     """Open-Meteo hourly forecast at the kickoff hour (free, no key)."""
     day = kickoff.astimezone(UTC).date().isoformat()
-    res = client.get(
-        "https://api.open-meteo.com/v1/forecast",
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "hourly": "temperature_2m,wind_speed_10m,precipitation,weather_code",
-            "timezone": "UTC",
-            "start_date": day,
-            "end_date": day,
-        },
-        timeout=20,
-    )
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": "temperature_2m,wind_speed_10m,precipitation,weather_code",
+        "timezone": "UTC",
+        "start_date": day,
+        "end_date": day,
+    }
+    for attempt in range(retries + 1):
+        try:
+            res = client.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=20)
+        except httpx.TransportError:
+            # Open-Meteo occasionally times out the TLS handshake; retry before failing the run.
+            if attempt == retries:
+                raise
+        else:
+            if (res.status_code != 429 and res.status_code < 500) or attempt == retries:
+                break
+        time.sleep(backoff_s * 2**attempt)
     res.raise_for_status()
     h = res.json()["hourly"]
     hour = kickoff.astimezone(UTC).strftime("%Y-%m-%dT%H:00")

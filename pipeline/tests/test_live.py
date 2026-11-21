@@ -1,7 +1,8 @@
 """Live updates: injury payloads, admin overrides (QB out) and forecasts as model inputs."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
+import httpx
 import pandas as pd
 import pytest
 from model_fixtures import synthetic
@@ -12,6 +13,7 @@ from endzoneiq_pipeline.live import (
     apply_forecasts,
     apply_overrides,
     condition,
+    fetch_forecast,
     players_injuries_payload,
     upcoming_week,
     with_kickoff,
@@ -114,3 +116,51 @@ def test_weather_codes():
     assert condition(75) == "snow"
     assert condition(95) == "thunderstorm"
     assert condition(None) is None
+
+
+def _forecast_json(hour: str) -> dict:
+    return {
+        "hourly": {
+            "time": [hour],
+            "temperature_2m": [4.0],
+            "wind_speed_10m": [20.0],
+            "precipitation": [0.5],
+            "weather_code": [61],
+        }
+    }
+
+
+def test_fetch_forecast_retries_transient_failures():
+
+    kickoff = datetime(2026, 11, 22, 18, 0, tzinfo=UTC)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if len(calls) == 1:
+            raise httpx.ConnectTimeout("handshake timed out", request=request)
+        if len(calls) == 2:
+            return httpx.Response(503)
+        return httpx.Response(200, json=_forecast_json("2026-11-22T18:00"))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        out = fetch_forecast(http, 40.0, -75.0, kickoff, backoff_s=0)
+    assert len(calls) == 3
+    assert out["tempC"] == 4.0 and out["windKph"] == 20.0
+
+
+def test_fetch_forecast_gives_up_after_retries():
+
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        raise httpx.ConnectTimeout("handshake timed out", request=request)
+
+    kickoff = datetime(2026, 11, 22, 18, 0, tzinfo=UTC)
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as http,
+        pytest.raises(httpx.ConnectTimeout),
+    ):
+        fetch_forecast(http, 40.0, -75.0, kickoff, retries=2, backoff_s=0)
+    assert len(calls) == 3
